@@ -278,12 +278,6 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 				}
 				xt := xBuf[:len(w.inx)]
 
-				// sort the indices by the winning split feature
-				bSort(xt, yt, w.inx)
-
-				// find split point
-				//sp := sort.SearchFloat64s(xt, vBest)
-
 				l, r := partition(xt, w.inx, vBest)
 
 				n.Left = &Node{Samples: len(l)}
