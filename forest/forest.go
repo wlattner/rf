@@ -140,15 +140,15 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 	}
 	// start workers
 	for i := 0; i < nWorkers; i++ {
-		go func() {
+		go func(id int) {
 			for inx := range in {
 				clf := tree.NewClassifier(tree.MinSplit(f.MinSplit), tree.MinLeaf(f.MinLeaf),
 					tree.MaxDepth(f.MaxDepth), tree.Impurity(f.impurity),
-					tree.MaxFeatures(f.MaxFeatures))
+					tree.MaxFeatures(f.MaxFeatures), tree.RandState(int64(id)))
 				clf.FitInx(X, Y, inx)
 				out <- clf
 			}
-		}()
+		}(i)
 	}
 
 	// fill the queue

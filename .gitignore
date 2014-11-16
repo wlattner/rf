@@ -3,3 +3,6 @@ iris_predict.csv
 pred.csv
 rf.model
 rf
+forest/cpu.out
+forest/forest.test
+rf.linux

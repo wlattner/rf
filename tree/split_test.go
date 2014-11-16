@@ -12,7 +12,9 @@ func TestBestSplit(t *testing.T) {
 	y := []int{0, 0, 0, 0, 0, 1, 1, 1, 1, 0}
 	classCount := []int{6, 4}
 
-	sp, gain := clf.bestSplit(xi, y, classCount, 0.48)
+	classCtL := make([]int, 2)
+	classCtR := make([]int, 2)
+	sp, gain := clf.bestSplit(xi, y, classCount, 0.48, classCtL, classCtR)
 
 	spActual := (xi[4] + xi[5]) / 2.0
 	if sp != spActual {
@@ -31,7 +33,9 @@ func TestBestSplitConstant(t *testing.T) {
 	y := []int{0, 0, 0, 0, 0, 1, 1, 1, 1, 0}
 	classCount := []int{6, 4}
 
-	sp, gain := clf.bestSplit(xi, y, classCount, 0.48)
+	classCtL := make([]int, 2)
+	classCtR := make([]int, 2)
+	sp, gain := clf.bestSplit(xi, y, classCount, 0.48, classCtL, classCtR)
 	spActual := 0.0 // feature is constant, should be no split
 	if sp != spActual {
 		t.Error("expected split to be:", spActual, " got:", sp)
@@ -49,7 +53,9 @@ func TestBestSplitSomeConstant(t *testing.T) {
 	y := []int{0, 0, 0, 0, 0, 1, 1, 1, 1, 0}
 	classCount := []int{6, 4}
 
-	sp, gain := clf.bestSplit(xi, y, classCount, 0.48)
+	classCtL := make([]int, 2)
+	classCtR := make([]int, 2)
+	sp, gain := clf.bestSplit(xi, y, classCount, 0.48, classCtL, classCtR)
 
 	spActual := (xi[4] + xi[5]) / 2.0
 	if sp != spActual {

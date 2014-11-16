@@ -11,7 +11,7 @@ import (
 	"io"
 	"math"
 	"math/rand"
-	"sort"
+	"time"
 )
 
 type ImpurityMeasure int
@@ -32,6 +32,7 @@ type Classifier struct {
 	MaxFeatures int // number of features to consider for splitting
 	Classes     []string
 	impurityFn  func(int, []int) float64
+	randState   *rand.Rand
 }
 
 // methods for the treeConfiger interface
@@ -49,6 +50,7 @@ func (c *Classifier) setImpurity(f ImpurityMeasure) {
 	}
 }
 func (c *Classifier) setMaxFeatures(n int) { c.MaxFeatures = n }
+func (c *Classifier) setRandState(n int64) { c.randState = rand.New(rand.NewSource(n)) }
 
 // interface for configuration so we can use the same args/functions to set
 // regression trees
@@ -58,6 +60,7 @@ type treeConfiger interface {
 	setMaxDepth(n int)
 	setImpurity(f ImpurityMeasure)
 	setMaxFeatures(n int)
+	setRandState(n int64)
 }
 
 // MinSplit limits the size for a node to be split vs marked as a leaf
@@ -99,6 +102,13 @@ func MaxFeatures(n int) func(treeConfiger) {
 	}
 }
 
+// RandState sets the seed for the random number generator
+func RandState(n int64) func(treeConfiger) {
+	return func(c treeConfiger) {
+		c.setRandState(n)
+	}
+}
+
 // NewClassifier returns a configured/initialized decision tree classifier.
 // If no options are passed, the returned Classifier will be equivalent the
 // following call:
@@ -111,6 +121,7 @@ func NewClassifier(options ...func(treeConfiger)) *Classifier {
 		MaxDepth:    -1,
 		MaxFeatures: -1,
 		impurityFn:  gini,
+		randState:   rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	for _, opt := range options {
@@ -134,6 +145,7 @@ func (t *Classifier) Fit(X [][]float64, Y []string) {
 // the examples in X and Y. FitInx is intended to be used with meta algorithm
 // that rely on bootstrap sampling, such as RandomForest.
 func (t *Classifier) FitInx(X [][]float64, Y []string, inx []int) {
+	//TODO: []int for Y instead; caller's responsibility to keep track
 	t.fit(X, Y, inx)
 }
 
@@ -174,6 +186,9 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 	// working copies of features and labels
 	xBuf := make([]float64, len(yIDs))
 	yBuf := make([]int, len(yIDs))
+
+	classCtL := make([]int, len(uniq))
+	classCtR := make([]int, len(uniq))
 
 	var s stack
 	s.Push(&stackNode{node: t.Root, inx: inx})
@@ -220,28 +235,43 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 				k := int(float64(j) * u)
 				features[k], features[j] = features[j], features[k]
 
+				currentFeature := features[j]
+				j--
+				visited++
+
 				// do work on feature[j]
+				if len(w.constantFeatures) > 0 && w.constantFeatures[currentFeature] {
+					continue
+				}
+
 				// copy feature values to buffer
 				for i, inx := range w.inx {
-					xBuf[i] = X[inx][features[j]]
+					xBuf[i] = X[inx][currentFeature]
 				}
 				xt := xBuf[:len(w.inx)]
 
 				// sort labels and indices by the value of the ith feature
 				bSort(xt, yt, w.inx)
-				v, d := t.bestSplit(xt, yt, n.ClassCounts, n.Impurity)
+
+				//TODO: find a better way to share the constant feature list with
+				// child nodes
+				if xt[len(xt)-1] <= xt[0]+1e-7 {
+					c := make([]bool, nFeatures)
+					copy(c, w.constantFeatures)
+					c[currentFeature] = true
+					w.constantFeatures = c
+					continue // constant feature, skip
+				}
+				v, d := t.bestSplit(xt, yt, n.ClassCounts, n.Impurity, classCtL, classCtR)
 
 				if d > dBest {
 					dBest = d
 					vBest = v
-					xBest = features[j]
+					xBest = currentFeature
 				}
-
-				j--
-				visited++
 			}
 
-			if dBest > 0 {
+			if dBest > 1e-7 {
 				// rebuffer best feature
 				for i, inx := range w.inx {
 					xBuf[i] = X[inx][xBest]
@@ -252,15 +282,17 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 				bSort(xt, yt, w.inx)
 
 				// find split point
-				sp := sort.SearchFloat64s(xt, vBest)
+				//sp := sort.SearchFloat64s(xt, vBest)
 
-				n.Left = &Node{Samples: len(w.inx[:sp])}
-				n.Right = &Node{Samples: len(w.inx[sp:])}
+				l, r := partition(xt, w.inx, vBest)
+
+				n.Left = &Node{Samples: len(l)}
+				n.Right = &Node{Samples: len(r)}
 				n.SplitVar = xBest
 				n.SplitVal = vBest
 
-				s.Push(&stackNode{node: n.Left, depth: w.depth + 1, inx: w.inx[:sp]})
-				s.Push(&stackNode{node: n.Right, depth: w.depth + 1, inx: w.inx[sp:]})
+				s.Push(&stackNode{node: n.Left, depth: w.depth + 1, inx: l, constantFeatures: w.constantFeatures})
+				s.Push(&stackNode{node: n.Right, depth: w.depth + 1, inx: r, constantFeatures: w.constantFeatures})
 			} else {
 				// we couldn't split the node, mark as leaf node
 				n.Leaf = true
@@ -334,20 +366,28 @@ func (t *Classifier) Load(r io.Reader) error {
 }
 
 // this function takes a lot of args
-func (t *Classifier) bestSplit(xi []float64, y []int, classCount []int, dInit float64) (float64, float64) {
+// TODO: we are making a lot of garbage in this function, consider using buffers
+// for the classCtL and classCtR slices
+func (t *Classifier) bestSplit(xi []float64, y []int, classCount []int, dInit float64,
+	classCtL []int, classCtR []int) (float64, float64) {
 	var dBest, vBest, v, d float64
 
 	n := len(xi)
 	nLeft := 0
 	nRight := n
-	classCtL := make([]int, len(classCount))
-	classCtR := make([]int, len(classCount))
+	//classCtL := make([]int, len(classCount))
+	//classCtR := make([]int, len(classCount))
+	// all examples start in right split
 	copy(classCtR, classCount)
+	// zero class counts for left split
+	for i := range classCtL {
+		classCtL[i] = 0
+	}
 
 	var lastCtr int // last time the counters were incremented
 
 	for i := 1; i < n; i++ {
-		if xi[i] == xi[i-1] {
+		if xi[i] <= xi[i-1]+1e-7 {
 			continue // can't split when x_i == x_i+1
 		}
 
@@ -413,14 +453,12 @@ func entropy(n int, ct []int) float64 {
 
 type stackNode struct {
 	inx              []int
-	constantFeatures []int
+	constantFeatures []bool
 	depth            int
 	node             *Node
 }
 
 type Node struct {
-	//TODO: separate node from unit of work
-	//TODO: store nodes in slice, left/right links index into slice
 	Left     *Node
 	Right    *Node
 	SplitVar int
@@ -428,11 +466,8 @@ type Node struct {
 	//TODO: do we need to store class counts at each node?
 	ClassCounts []int
 	Impurity    float64
-	//TODO: do we need to store inx slice at each node?
-	// inx   []int
-	Leaf    bool
-	Samples int
-	// depth int
+	Leaf        bool
+	Samples     int
 }
 
 // lifo stack for unexpanded nodes
@@ -444,4 +479,36 @@ func (s *stack) Pop() *stackNode {
 	d := (*s)[len(*s)-1]
 	*s = (*s)[:len(*s)-1]
 	return d
+}
+
+// partition xt, and inx into left and right
+func partition(xt []float64, inx []int, x float64) ([]int, []int) {
+	i := 0
+	j := len(xt) - 1
+
+	for xt[i] <= x && i < j {
+		i++
+	}
+
+	for x < xt[j] && i < j {
+		j--
+	}
+
+	for i < j {
+		inx[i], inx[j] = inx[j], inx[i]
+		xt[i], xt[j] = xt[j], xt[i]
+		// yt[i], yt[j] = yt[j], yt[i]
+		i++
+		j--
+
+		for xt[i] <= x && i < j {
+			i++
+		}
+
+		for x < xt[j] && i < j {
+			j--
+		}
+	}
+
+	return inx[:j], inx[j:]
 }

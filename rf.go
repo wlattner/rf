@@ -7,10 +7,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/wlattner/rf/forest"
 	"github.com/wlattner/rf/tree"
+
+	"github.com/davecheney/profile"
 )
 
 var (
@@ -23,12 +27,18 @@ var (
 	dataFile    = flag.String("data", "", "csv file with training data")
 	predictFile = flag.String("predictions", "", "output file for predictions")
 	modelFile   = flag.String("model", "rf.model", "file to write/read model")
+	nWorkers    = flag.Int("workers", 1, "number of workers for fitting trees")
+	runProfile  = flag.Bool("profile", false, "cpu profile")
 )
 
 var impurityCode = map[string]tree.ImpurityMeasure{"gini": tree.Gini, "entropy": tree.Entropy}
 
 func main() {
 	flag.Parse()
+
+	if *nWorkers > 1 {
+		runtime.GOMAXPROCS(runtime.NumCPU())
+	}
 
 	if *predictFile == "" {
 		// is fit
@@ -53,9 +63,16 @@ func main() {
 
 		clf := forest.NewClassifier(forest.NumTrees(*nTree), forest.MinSplit(*minSplit),
 			forest.MinLeaf(*minLeaf), forest.MaxDepth(*maxDepth),
-			forest.MaxFeatures(*maxFeatures), forest.Impurity(imp))
+			forest.MaxFeatures(*maxFeatures), forest.Impurity(imp),
+			forest.NumWorkers(*nWorkers))
 
+		if *runProfile {
+			defer profile.Start(profile.CPUProfile).Stop()
+		}
+		start := time.Now()
 		clf.Fit(X, Y)
+		d := time.Since(start)
+		fmt.Printf("fitting took %.2fs\n", d.Seconds())
 
 		out, err := os.Create(*modelFile)
 		if err != nil {
