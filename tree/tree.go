@@ -133,43 +133,44 @@ func NewClassifier(options ...func(treeConfiger)) *Classifier {
 
 // Fit constructs a tree from the provided features X, and labels Y.
 func (t *Classifier) Fit(X [][]float32, Y []string) {
-	inx := make([]int, len(Y))
-	for i := 0; i < len(Y); i++ {
-		inx[i] = i
-	}
-
-	t.fit(X, Y, inx)
-}
-
-// FitInx constructs a tree as in Fit, but uses the inx slice to mask
-// the examples in X and Y. FitInx is intended to be used with meta algorithm
-// that rely on bootstrap sampling, such as RandomForest.
-func (t *Classifier) FitInx(X [][]float32, Y []string, inx []int) {
-	//TODO: []int for Y instead; caller's responsibility to keep track
-	t.fit(X, Y, inx)
-}
-
-func (t *Classifier) fit(X [][]float32, Y []string, inx []int) {
-	// all examples are in root node
-	t.Root = &Node{Samples: len(inx)}
-
-	// recode Y with integer ids
+	// labels as integer ids
 	var yIDs []int
 	uniq := make(map[string]int)
+	var classes []string
 	for _, val := range Y {
 		id, ok := uniq[val]
 		if !ok {
 			id = len(uniq)
 			uniq[val] = id
+			classes = append(classes, val)
 		}
 		yIDs = append(yIDs, id)
 	}
 
-	// save class id to name mapping
-	t.Classes = make([]string, len(uniq))
-	for class, id := range uniq {
-		t.Classes[id] = class
+	inx := make([]int, len(Y))
+	for i := 0; i < len(Y); i++ {
+		inx[i] = i
 	}
+
+	t.fit(X, yIDs, inx, classes)
+}
+
+// FitInx constructs a tree as in Fit, but uses the inx slice to mask
+// the examples in X and Y. The caller also needs to supply a slice of unique
+// classes where the ith class corresponds to the integer id used in Y (a mapping
+// of class id to class name). FitInx is intended to be used with meta algorithm
+// that rely on bootstrap sampling, such as RandomForest.
+func (t *Classifier) FitInx(X [][]float32, Y []int, inx []int, classes []string) {
+	t.fit(X, Y, inx, classes)
+}
+
+// classes should be a mapping from integer ids to string class names, len(classes)
+// should equal max(Y)
+func (t *Classifier) fit(X [][]float32, Y []int, inx []int, classes []string) {
+	// all examples are in root node
+	t.Root = &Node{Samples: len(inx)}
+
+	t.Classes = classes
 
 	nFeatures := len(X[0])
 
@@ -184,11 +185,11 @@ func (t *Classifier) fit(X [][]float32, Y []string, inx []int) {
 	}
 
 	// working copies of features and labels
-	xBuf := make([]float32, len(yIDs))
+	xBuf := make([]float32, len(inx))
 
-	classCtL := make([]int, len(uniq))
-	classCtR := make([]int, len(uniq))
-	classCtrZero := make([]int, len(uniq))
+	classCtL := make([]int, len(classes))
+	classCtR := make([]int, len(classes))
+	classCtrZero := make([]int, len(classes))
 
 	var s stack
 	s.Push(&stackNode{node: t.Root, inx: inx})
@@ -197,9 +198,9 @@ func (t *Classifier) fit(X [][]float32, Y []string, inx []int) {
 		w := s.Pop()
 		n := w.node
 
-		n.ClassCounts = make([]int, len(uniq))
+		n.ClassCounts = make([]int, len(classes))
 		for _, inx := range w.inx {
-			n.ClassCounts[yIDs[inx]]++
+			n.ClassCounts[Y[inx]]++
 		}
 
 		// TODO: this condition is getting complex
@@ -260,7 +261,7 @@ func (t *Classifier) fit(X [][]float32, Y []string, inx []int) {
 				// copy current class counts
 				copy(classCtR, n.ClassCounts)
 
-				v, d, pos := t.bestSplit(xt, yIDs, w.inx, n.Impurity, classCtL, classCtR)
+				v, d, pos := t.bestSplit(xt, Y, w.inx, n.Impurity, classCtL, classCtR)
 
 				if d > dBest {
 					dBest = d

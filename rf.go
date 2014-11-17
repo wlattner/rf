@@ -84,7 +84,7 @@ func main() {
 		start := time.Now()
 		clf.Fit(X, Y)
 		d := time.Since(start)
-		fmt.Fprintln(os.Stderr, "fitting took %.2fs\n", d.Seconds())
+		fmt.Fprintf(os.Stderr, "fitting took %.2fs\n", d.Seconds())
 
 		out, err := os.Create(*modelFile)
 		if err != nil {
