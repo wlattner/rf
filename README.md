@@ -78,3 +78,10 @@ rf --data iris_new.csv --predictions iris_predictions.csv --model iris.model
 
 `--model` location of previously fitted model file
 
+Docs
+----
+Documentation for the two packages, forest and tree can be found on godoc. `tree` implements classification trees while `forest` implements random forests using `tree`. See `rf.go` in this repository for an example of using the `forest` package.
+
+**forest:** http://godoc.org/github.com/wlattner/rf/forest
+
+**tree:** http://godoc.org/github.com/wlattner/rf/tree
