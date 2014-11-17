@@ -1,4 +1,4 @@
-// This package implements classification and regression trees as described in
+// tree implements classification and regression trees as described in
 // Louppe, G. (2014) "Understanding Random Forests: From Theory to Practice" (PhD thesis)
 // http://arxiv.org/abs/1407.7502
 //
