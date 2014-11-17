@@ -131,6 +131,21 @@ func NewClassifier(options ...func(forestConfiger)) *ForestClassifier {
 // Fit constructs a forest from fitting n trees from the provided features X, and
 // labels Y.
 func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
+	// labels as integer ids, ensure all trees know about all classes
+	var yIDs []int
+	uniq := make(map[string]int)
+	var classes []string
+	for _, val := range Y {
+		id, ok := uniq[val]
+		if !ok {
+			id = len(uniq)
+			uniq[val] = id
+			classes = append(classes, val)
+		}
+		yIDs = append(yIDs, id)
+	}
+	f.Classes = classes
+
 	f.Trees = make([]*tree.Classifier, f.NTrees)
 
 	if f.MaxFeatures < 0 {
@@ -151,7 +166,7 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 				clf := tree.NewClassifier(tree.MinSplit(f.MinSplit), tree.MinLeaf(f.MinLeaf),
 					tree.MaxDepth(f.MaxDepth), tree.Impurity(f.impurity),
 					tree.MaxFeatures(f.MaxFeatures), tree.RandState(int64(id)))
-				clf.FitInx(X, Y, inx)
+				clf.FitInx(X, yIDs, inx, classes)
 				out <- clf
 			}
 		}(i)
@@ -169,8 +184,6 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 	for i := range f.Trees {
 		f.Trees[i] = <-out
 	}
-
-	f.Classes = f.Trees[0].Classes
 }
 
 // Predict returns the most probable label for each example.
