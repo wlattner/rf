@@ -164,11 +164,11 @@ func writePred(w io.Writer, prediction []string) error {
 	return wtr.Flush()
 }
 
-func parseCSV(r io.Reader) ([][]float64, []string, error) {
+func parseCSV(r io.Reader) ([][]float32, []string, error) {
 	reader := csv.NewReader(r)
 
 	var (
-		X [][]float64
+		X [][]float32
 		Y []string
 	)
 
@@ -183,13 +183,13 @@ func parseCSV(r io.Reader) ([][]float64, []string, error) {
 
 		Y = append(Y, row[0])
 
-		var rowVal []float64
+		var rowVal []float32
 		for _, val := range row[1:] { // data starts in 2nd column
-			fv, err := strconv.ParseFloat(val, 64)
+			fv, err := strconv.ParseFloat(val, 32)
 			if err != nil {
 				return X, Y, err
 			}
-			rowVal = append(rowVal, fv)
+			rowVal = append(rowVal, float32(fv))
 		}
 		X = append(X, rowVal)
 	}

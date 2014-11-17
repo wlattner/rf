@@ -130,7 +130,7 @@ func NewClassifier(options ...func(forestConfiger)) *ForestClassifier {
 
 // Fit constructs a forest from fitting n trees from the provided features X, and
 // labels Y.
-func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
+func (f *ForestClassifier) Fit(X [][]float32, Y []string) {
 	// labels as integer ids, ensure all trees know about all classes
 	var yIDs []int
 	uniq := make(map[string]int)
@@ -187,7 +187,7 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 }
 
 // Predict returns the most probable label for each example.
-func (f *ForestClassifier) Predict(X [][]float64) []string {
+func (f *ForestClassifier) Predict(X [][]float32) []string {
 	p := f.PredictProb(X)
 	maxC := make([]string, len(X))
 
@@ -212,7 +212,7 @@ func (f *ForestClassifier) Predict(X [][]float64) []string {
 
 // PredictProb returns the class probability for each example. The indices of the
 // return value correspond to Classifier.Classes.
-func (f *ForestClassifier) PredictProb(X [][]float64) [][]float64 {
+func (f *ForestClassifier) PredictProb(X [][]float32) [][]float64 {
 	//TODO: weighted voting...
 	probs := make([][]float64, len(X))
 	// initialize the other dim
