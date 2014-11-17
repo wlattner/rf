@@ -3,6 +3,8 @@ rf
 
 This is a Go implementation of a random forest classifier, as described in Louppe, G. (2014) ["Understanding Random Forests: From Theory to Practice"](http://arxiv.org/abs/1407.7502) (PhD thesis). Both the random forest and the decision tree are usable as standalone Go packages. The commandline app can fit a model from a csv file and make predictions from a previously fitted model and a csv file with new examples. The csv parser is rather limited, only numeric values are accepted.
 
+[![GoDoc](https://godoc.org/github.com/wlattner/rf?status.svg)](http://godoc.org/github.com/wlattner/rf)
+
 Install
 -------
 ```bash
@@ -75,3 +77,4 @@ rf --data iris_new.csv --predictions iris_predictions.csv --model iris.model
 `--predictions` file for writing predictions
 
 `--model` location of previously fitted model file
+
