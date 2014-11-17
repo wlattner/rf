@@ -132,7 +132,7 @@ func NewClassifier(options ...func(treeConfiger)) *Classifier {
 }
 
 // Fit constructs a tree from the provided features X, and labels Y.
-func (t *Classifier) Fit(X [][]float64, Y []string) {
+func (t *Classifier) Fit(X [][]float32, Y []string) {
 	inx := make([]int, len(Y))
 	for i := 0; i < len(Y); i++ {
 		inx[i] = i
@@ -144,12 +144,12 @@ func (t *Classifier) Fit(X [][]float64, Y []string) {
 // FitInx constructs a tree as in Fit, but uses the inx slice to mask
 // the examples in X and Y. FitInx is intended to be used with meta algorithm
 // that rely on bootstrap sampling, such as RandomForest.
-func (t *Classifier) FitInx(X [][]float64, Y []string, inx []int) {
+func (t *Classifier) FitInx(X [][]float32, Y []string, inx []int) {
 	//TODO: []int for Y instead; caller's responsibility to keep track
 	t.fit(X, Y, inx)
 }
 
-func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
+func (t *Classifier) fit(X [][]float32, Y []string, inx []int) {
 	// all examples are in root node
 	t.Root = &Node{Samples: len(inx)}
 
@@ -184,7 +184,7 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 	}
 
 	// working copies of features and labels
-	xBuf := make([]float64, len(yIDs))
+	xBuf := make([]float32, len(yIDs))
 
 	classCtL := make([]int, len(uniq))
 	classCtR := make([]int, len(uniq))
@@ -213,7 +213,7 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 
 			var (
 				dBest float64
-				vBest float64
+				vBest float32
 				xBest int
 				iBest int
 			)
@@ -302,7 +302,7 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 }
 
 // Predict returns the most probable label for each example.
-func (t *Classifier) Predict(X [][]float64) []string {
+func (t *Classifier) Predict(X [][]float32) []string {
 	p := make([]string, len(X))
 
 	for i := range p {
@@ -331,7 +331,7 @@ func (t *Classifier) Predict(X [][]float64) []string {
 
 // PredictProb returns the class probability for each example. The indices
 // of the return value correspond to Classifier.Classes.
-func (t *Classifier) PredictProb(X [][]float64) [][]float64 {
+func (t *Classifier) PredictProb(X [][]float32) [][]float64 {
 	p := make([][]float64, len(X))
 
 	for i := range p {
@@ -368,12 +368,13 @@ func (t *Classifier) Load(r io.Reader) error {
 // this function takes a lot of args
 // classCtl and classCtR should be initialized by the caller, classCtL should
 // be all zeros, classCtR should be the counts for the current node
-func (t *Classifier) bestSplit(xi []float64, y []int, inx []int, dInit float64,
-	classCtL []int, classCtR []int) (float64, float64, int) {
+func (t *Classifier) bestSplit(xi []float32, y []int, inx []int, dInit float64,
+	classCtL []int, classCtR []int) (float32, float64, int) {
 
 	var (
-		dBest, vBest, v, d float64
-		pos                int
+		dBest, d float64
+		vBest, v float32
+		pos      int
 	)
 
 	n := len(xi)
@@ -461,7 +462,7 @@ type Node struct {
 	Left     *Node
 	Right    *Node
 	SplitVar int
-	SplitVal float64
+	SplitVal float32
 	//TODO: do we need to store class counts at each node?
 	ClassCounts []int
 	Impurity    float64
