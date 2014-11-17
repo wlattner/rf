@@ -256,7 +256,7 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 				}
 
 				// zero left crt
-				copy(classCtL, classCtrZero)
+				copy(classCtL, classCtrZero) // faster than clearing w/ for loop
 				// copy current class counts
 				copy(classCtR, n.ClassCounts)
 
@@ -366,20 +366,19 @@ func (t *Classifier) Load(r io.Reader) error {
 }
 
 // this function takes a lot of args
-// classCtl and classCtr should be initialized by the caller, classCtL should
-// be all zeros, classCtr should be the counts for the current node
+// classCtl and classCtR should be initialized by the caller, classCtL should
+// be all zeros, classCtR should be the counts for the current node
 func (t *Classifier) bestSplit(xi []float64, y []int, inx []int, dInit float64,
 	classCtL []int, classCtR []int) (float64, float64, int) {
-	var dBest, vBest, v, d float64
-	var pos int
+
+	var (
+		dBest, vBest, v, d float64
+		pos                int
+	)
 
 	n := len(xi)
 	nLeft := 0
 	nRight := n
-	//classCtL := make([]int, len(classCount))
-	//classCtR := make([]int, len(classCount))
-	// all examples start in right split
-	// zero class counts for left split
 
 	var lastCtr int // last time the counters were incremented
 

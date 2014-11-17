@@ -200,6 +200,7 @@ func (f *ForestClassifier) Predict(X [][]float64) []string {
 // PredictProb returns the class probability for each example. The indices of the
 // return value correspond to Classifier.Classes.
 func (f *ForestClassifier) PredictProb(X [][]float64) [][]float64 {
+	//TODO: weighted voting...
 	probs := make([][]float64, len(X))
 	// initialize the other dim
 	for row := range probs {
