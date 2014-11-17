@@ -16,15 +16,17 @@ import (
 )
 
 type ForestClassifier struct {
-	NTrees      int
-	MinSplit    int
-	MinLeaf     int
-	MaxDepth    int
-	MaxFeatures int
-	Classes     []string
-	Trees       []*tree.Classifier
-	impurity    tree.ImpurityMeasure
-	nWorkers    int
+	NTrees          int
+	MinSplit        int
+	MinLeaf         int
+	MaxDepth        int
+	MaxFeatures     int
+	Classes         []string
+	Trees           []*tree.Classifier
+	impurity        tree.ImpurityMeasure
+	nWorkers        int
+	computeOOB      bool
+	ConfusionMatrix [][]int
 }
 
 // methods for the forestConfiger interface
@@ -35,6 +37,7 @@ func (c *ForestClassifier) setImpurity(f tree.ImpurityMeasure) { c.impurity = f 
 func (c *ForestClassifier) setMaxFeatures(n int)               { c.MaxFeatures = n }
 func (c *ForestClassifier) setNumTrees(n int)                  { c.NTrees = n }
 func (c *ForestClassifier) setNumWorkers(n int)                { c.nWorkers = n }
+func (c *ForestClassifier) setComputeOOB()                     { c.computeOOB = true }
 
 type forestConfiger interface {
 	setMinSplit(n int)
@@ -44,6 +47,7 @@ type forestConfiger interface {
 	setMaxFeatures(n int)
 	setNumTrees(n int)
 	setNumWorkers(n int)
+	setComputeOOB()
 }
 
 var (
@@ -105,6 +109,14 @@ func NumWorkers(n int) func(forestConfiger) {
 	}
 }
 
+// ComputeOOB computes the confusion matrix from out of bag samples
+// for each tree.
+func ComputeOOB() func(forestConfiger) {
+	return func(c forestConfiger) {
+		c.setComputeOOB()
+	}
+}
+
 // NewClassifier returns a configured/initialized random forest classifier.
 // If no options are passed, the returned Classifier will be equivalent to
 // the following call:
@@ -152,8 +164,8 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 		f.MaxFeatures = int(math.Sqrt(float64(len(X[0]))))
 	}
 
-	in := make(chan []int)
-	out := make(chan *tree.Classifier)
+	in := make(chan *fitTree)
+	out := make(chan *fitTree)
 
 	nWorkers := f.nWorkers
 	if nWorkers < 1 {
@@ -162,12 +174,18 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 	// start workers
 	for i := 0; i < nWorkers; i++ {
 		go func(id int) {
-			for inx := range in {
+			for w := range in {
 				clf := tree.NewClassifier(tree.MinSplit(f.MinSplit), tree.MinLeaf(f.MinLeaf),
 					tree.MaxDepth(f.MaxDepth), tree.Impurity(f.impurity),
 					tree.MaxFeatures(f.MaxFeatures), tree.RandState(int64(id)))
-				clf.FitInx(X, yIDs, inx, classes)
-				out <- clf
+				clf.FitInx(X, yIDs, w.inx, classes)
+
+				w.t = clf
+
+				if f.computeOOB {
+					w.confMat = oobConfusionMat(X, yIDs, w.inBag, w.t)
+				}
+				out <- w
 			}
 		}(i)
 	}
@@ -175,14 +193,29 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 	// fill the queue
 	go func() {
 		for _ = range f.Trees {
-			inx := bootstrapInx(len(X))
-			in <- inx
+			inx, inBag := bootstrapInx(len(X))
+			in <- &fitTree{inx: inx, inBag: inBag}
 		}
 		close(in)
 	}()
 
+	if f.computeOOB {
+		for _ = range f.Classes {
+			f.ConfusionMatrix = append(f.ConfusionMatrix, make([]int, len(f.Classes)))
+		}
+	}
+
 	for i := range f.Trees {
-		f.Trees[i] = <-out
+		w := <-out
+		f.Trees[i] = w.t
+
+		if f.computeOOB {
+			for row := range w.confMat {
+				for col := range w.confMat {
+					f.ConfusionMatrix[row][col] += w.confMat[row][col]
+				}
+			}
+		}
 	}
 }
 
@@ -242,10 +275,43 @@ func (f *ForestClassifier) Load(r io.Reader) error {
 	return d.Decode(f)
 }
 
-func bootstrapInx(n int) []int {
+type fitTree struct {
+	t       *tree.Classifier
+	inx     []int
+	inBag   []bool
+	confMat [][]int
+}
+
+func bootstrapInx(n int) ([]int, []bool) {
+	inBag := make([]bool, n)
 	inx := make([]int, n)
 	for i := range inx {
-		inx[i] = rand.Intn(n)
+		id := rand.Intn(n)
+		inx[i] = id
+		inBag[id] = true
 	}
-	return inx
+	return inx, inBag
+}
+
+func oobConfusionMat(X [][]float64, Y []int, inBag []bool, t *tree.Classifier) [][]int {
+	// find the indices not inBag
+	var inx []int
+	for i, in := range inBag {
+		if !in {
+			inx = append(inx, i)
+		}
+	}
+
+	confusionMat := make([][]int, len(t.Classes))
+	for i := range confusionMat {
+		confusionMat[i] = make([]int, len(t.Classes))
+	}
+
+	pred := t.PredictID(X, inx)
+
+	for i, id := range inx {
+		confusionMat[Y[id]][pred[i]]++
+	}
+
+	return confusionMat
 }

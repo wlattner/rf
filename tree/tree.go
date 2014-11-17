@@ -330,6 +330,34 @@ func (t *Classifier) Predict(X [][]float64) []string {
 	return p
 }
 
+// PredictInx returns the most probable class index for each input example masked by inx.
+// This function is intended for OOB error estimating.
+func (t *Classifier) PredictID(X [][]float64, inx []int) []int {
+	p := make([]int, len(inx))
+
+	for i, id := range inx {
+		n := t.Root
+		for !n.Leaf {
+			if X[id][n.SplitVar] > n.SplitVal {
+				n = n.Right
+			} else {
+				n = n.Left
+			}
+		}
+
+		maxCt := 0
+		maxC := 0
+		for class, count := range n.ClassCounts {
+			if count > maxCt {
+				maxCt = count
+				maxC = class
+			}
+		}
+		p[i] = maxC
+	}
+	return p
+}
+
 // PredictProb returns the class probability for each example. The indices
 // of the return value correspond to Classifier.Classes.
 func (t *Classifier) PredictProb(X [][]float64) [][]float64 {

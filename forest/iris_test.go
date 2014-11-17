@@ -6,7 +6,7 @@ import (
 )
 
 func TestIrisFitPredict(t *testing.T) {
-	clf := NewClassifier(NumTrees(10))
+	clf := NewClassifier(NumTrees(10), ComputeOOB())
 
 	clf.Fit(X, Y)
 
@@ -19,6 +19,32 @@ func TestIrisFitPredict(t *testing.T) {
 			correctFrac += contrib
 		}
 	}
+
+	// fmt.Println(clf.ConfusionMatrix)
+
+	// confMat := make([][]int, len(clf.Classes))
+	// for i := range confMat {
+	// 	confMat[i] = make([]int, len(clf.Classes))
+	// }
+
+	// for i, className := range pred {
+	// 	actClassName := Y[i]
+
+	// 	var predClassID int
+	// 	var actClassID int
+	// 	for id, c := range clf.Classes {
+	// 		if c == className {
+	// 			predClassID = id
+	// 		}
+	// 		if c == actClassName {
+	// 			actClassID = id
+	// 		}
+	// 	}
+
+	// 	confMat[actClassID][predClassID]++
+	// }
+
+	// fmt.Println(confMat)
 
 	if correctFrac < 0.98 {
 		t.Errorf("expected accuracy on iris data to be at least 0.98, got: %f", correctFrac)
