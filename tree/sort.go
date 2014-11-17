@@ -14,24 +14,23 @@ func min(a, b int) int {
 	return b
 }
 
-func swap(x []float64, y []int, inx []int, i, j int) {
+func swap(x []float64, inx []int, i, j int) {
 	x[i], x[j] = x[j], x[i]
-	y[i], y[j] = y[j], y[i]
 	inx[i], inx[j] = inx[j], inx[i]
 }
 
 // Insertion sort
-func insertionSort(x []float64, y []int, inx []int, a, b int) {
+func insertionSort(x []float64, inx []int, a, b int) {
 	for i := a + 1; i < b; i++ {
 		for j := i; j > a && x[j] < x[j-1]; j-- {
-			swap(x, y, inx, j, j-1)
+			swap(x, inx, j, j-1)
 		}
 	}
 }
 
 // siftDown implements the heap property on data[lo, hi).
 // first is an offset into the array where the root of the heap lies.
-func siftDown(x []float64, y []int, inx []int, lo, hi, first int) {
+func siftDown(x []float64, inx []int, lo, hi, first int) {
 	root := lo
 	for {
 		child := 2*root + 1
@@ -44,25 +43,25 @@ func siftDown(x []float64, y []int, inx []int, lo, hi, first int) {
 		if !(x[first+root] < x[first+child]) {
 			return
 		}
-		swap(x, y, inx, first+root, first+child)
+		swap(x, inx, first+root, first+child)
 		root = child
 	}
 }
 
-func heapSort(x []float64, y []int, inx []int, a, b int) {
+func heapSort(x []float64, inx []int, a, b int) {
 	first := a
 	lo := 0
 	hi := b - a
 
 	// Build heap with greatest element at top.
 	for i := (hi - 1) / 2; i >= 0; i-- {
-		siftDown(x, y, inx, i, hi, first)
+		siftDown(x, inx, i, hi, first)
 	}
 
 	// Pop elements, largest first, into end of data.
 	for i := hi - 1; i >= 0; i-- {
-		swap(x, y, inx, first, first+i)
-		siftDown(x, y, inx, lo, i, first)
+		swap(x, inx, first, first+i)
+		siftDown(x, inx, lo, i, first)
 	}
 }
 
@@ -70,39 +69,39 @@ func heapSort(x []float64, y []int, inx []int, a, b int) {
 // ``Engineering a Sort Function,'' SP&E November 1993.
 
 // medianOfThree moves the median of the three values data[a], data[b], data[c] into data[a].
-func medianOfThree(x []float64, y []int, inx []int, a, b, c int) {
+func medianOfThree(x []float64, inx []int, a, b, c int) {
 	m0 := b
 	m1 := a
 	m2 := c
 	// bubble sort on 3 elements
 	if x[m1] < x[m0] {
-		swap(x, y, inx, m1, m0)
+		swap(x, inx, m1, m0)
 	}
 	if x[m2] < x[m1] {
-		swap(x, y, inx, m2, m1)
+		swap(x, inx, m2, m1)
 	}
 	if x[m1] < x[m0] {
-		swap(x, y, inx, m1, m0)
+		swap(x, inx, m1, m0)
 	}
 	// now data[m0] <= data[m1] <= data[m2]
 }
 
-func swapRange(x []float64, y []int, inx []int, a, b, n int) {
+func swapRange(x []float64, inx []int, a, b, n int) {
 	for i := 0; i < n; i++ {
-		swap(x, y, inx, a+i, b+i)
+		swap(x, inx, a+i, b+i)
 	}
 }
 
-func doPivot(x []float64, y []int, inx []int, lo, hi int) (midlo, midhi int) {
+func doPivot(x []float64, inx []int, lo, hi int) (midlo, midhi int) {
 	m := lo + (hi-lo)/2 // Written like this to avoid integer overflow.
 	if hi-lo > 40 {
 		// Tukey's ``Ninther,'' median of three medians of three.
 		s := (hi - lo) / 8
-		medianOfThree(x, y, inx, lo, lo+s, lo+2*s)
-		medianOfThree(x, y, inx, m, m-s, m+s)
-		medianOfThree(x, y, inx, hi-1, hi-1-s, hi-1-2*s)
+		medianOfThree(x, inx, lo, lo+s, lo+2*s)
+		medianOfThree(x, inx, m, m-s, m+s)
+		medianOfThree(x, inx, hi-1, hi-1-s, hi-1-2*s)
 	}
-	medianOfThree(x, y, inx, lo, m, hi-1)
+	medianOfThree(x, inx, lo, m, hi-1)
 
 	// Invariants are:
 	//	data[lo] = pivot (set up by ChoosePivot)
@@ -121,7 +120,7 @@ func doPivot(x []float64, y []int, inx []int, lo, hi int) (midlo, midhi int) {
 			if x[b] < x[pivot] { // data[b] < pivot
 				b++
 			} else if !(x[pivot] < x[b]) { // data[b] = pivot
-				swap(x, y, inx, a, b)
+				swap(x, inx, a, b)
 				a++
 				b++
 			} else {
@@ -132,7 +131,7 @@ func doPivot(x []float64, y []int, inx []int, lo, hi int) (midlo, midhi int) {
 			if x[pivot] < x[c-1] { // data[c-1] > pivot
 				c--
 			} else if !(x[c-1] < x[pivot]) { // data[c-1] = pivot
-				swap(x, y, inx, c-1, d-1)
+				swap(x, inx, c-1, d-1)
 				c--
 				d--
 			} else {
@@ -143,47 +142,47 @@ func doPivot(x []float64, y []int, inx []int, lo, hi int) (midlo, midhi int) {
 			break
 		}
 		// data[b] > pivot; data[c-1] < pivot
-		swap(x, y, inx, b, c-1)
+		swap(x, inx, b, c-1)
 		b++
 		c--
 	}
 
 	n := min(b-a, a-lo)
-	swapRange(x, y, inx, lo, b-n, n)
+	swapRange(x, inx, lo, b-n, n)
 
 	n = min(hi-d, d-c)
-	swapRange(x, y, inx, c, hi-n, n)
+	swapRange(x, inx, c, hi-n, n)
 
 	return lo + b - a, hi - (d - c)
 }
 
-func quickSort(x []float64, y []int, inx []int, a, b, maxDepth int) {
+func quickSort(x []float64, inx []int, a, b, maxDepth int) {
 	for b-a > 7 {
 		if maxDepth == 0 {
-			heapSort(x, y, inx, a, b)
+			heapSort(x, inx, a, b)
 			return
 		}
 		maxDepth--
-		mlo, mhi := doPivot(x, y, inx, a, b)
+		mlo, mhi := doPivot(x, inx, a, b)
 		// Avoiding recursion on the larger subproblem guarantees
 		// a stack depth of at most lg(b-a).
 		if mlo-a < b-mhi {
-			quickSort(x, y, inx, a, mlo, maxDepth)
+			quickSort(x, inx, a, mlo, maxDepth)
 			a = mhi // i.e., quickSort(data, mhi, b)
 		} else {
-			quickSort(x, y, inx, mhi, b, maxDepth)
+			quickSort(x, inx, mhi, b, maxDepth)
 			b = mlo // i.e., quickSort(data, a, mlo)
 		}
 	}
 	if b-a > 1 {
-		insertionSort(x, y, inx, a, b)
+		insertionSort(x, inx, a, b)
 	}
 }
 
 // Sort sorts data.
 // It makes one call to data.Len to determine n, and O(n*log(n)) calls to
 // data.Less and data.Swap. The sort is not guaranteed to be stable.
-func bSort(x []float64, y []int, inx []int) {
+func bSort(x []float64, inx []int) {
 	// Switch to heapsort if depth of 2*ceil(lg(n+1)) is reached.
 	n := len(inx)
 	maxDepth := 0
@@ -191,5 +190,5 @@ func bSort(x []float64, y []int, inx []int) {
 		maxDepth++
 	}
 	maxDepth *= 2
-	quickSort(x, y, inx, 0, n, maxDepth)
+	quickSort(x, inx, 0, n, maxDepth)
 }

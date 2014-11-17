@@ -185,10 +185,10 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 
 	// working copies of features and labels
 	xBuf := make([]float64, len(yIDs))
-	yBuf := make([]int, len(yIDs))
 
 	classCtL := make([]int, len(uniq))
 	classCtR := make([]int, len(uniq))
+	classCtrZero := make([]int, len(uniq))
 
 	var s stack
 	s.Push(&stackNode{node: t.Root, inx: inx})
@@ -197,25 +197,16 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 		w := s.Pop()
 		n := w.node
 
+		n.ClassCounts = make([]int, len(uniq))
+		for _, inx := range w.inx {
+			n.ClassCounts[yIDs[inx]]++
+		}
+
 		// TODO: this condition is getting complex
 		if (t.MinSplit > 0 && len(w.inx) < t.MinSplit) || (t.MaxDepth > 0 && w.depth == t.MaxDepth) {
 			// mark as leaf node, too small to split
 			n.Leaf = true
-			// add class counts if we haven't already
-			if len(n.ClassCounts) == 0 {
-				n.ClassCounts = make([]int, len(uniq))
-				for _, inx := range w.inx {
-					n.ClassCounts[yIDs[inx]]++
-				}
-			}
 		} else {
-			// count classes and copy labels
-			n.ClassCounts = make([]int, len(uniq))
-			for i, inx := range w.inx {
-				yBuf[i] = yIDs[inx]
-				n.ClassCounts[yIDs[inx]]++
-			}
-			yt := yBuf[:len(w.inx)]
 
 			// compute impurity for node
 			n.Impurity = t.impurityFn(len(w.inx), n.ClassCounts)
@@ -224,6 +215,7 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 				dBest float64
 				vBest float64
 				xBest int
+				iBest int
 			)
 
 			// sample from maxFeatures from features using Fisher-Yates,
@@ -251,7 +243,7 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 				xt := xBuf[:len(w.inx)]
 
 				// sort labels and indices by the value of the ith feature
-				bSort(xt, yt, w.inx)
+				bSort(xt, w.inx)
 
 				//TODO: find a better way to share the constant feature list with
 				// child nodes
@@ -262,23 +254,37 @@ func (t *Classifier) fit(X [][]float64, Y []string, inx []int) {
 					w.constantFeatures = c
 					continue // constant feature, skip
 				}
-				v, d := t.bestSplit(xt, yt, n.ClassCounts, n.Impurity, classCtL, classCtR)
+
+				// zero left crt
+				copy(classCtL, classCtrZero)
+				// copy current class counts
+				copy(classCtR, n.ClassCounts)
+
+				v, d, pos := t.bestSplit(xt, yIDs, w.inx, n.Impurity, classCtL, classCtR)
 
 				if d > dBest {
 					dBest = d
 					vBest = v
 					xBest = currentFeature
+					iBest = pos
 				}
 			}
 
-			if dBest > 1e-7 {
-				// rebuffer best feature
-				for i, inx := range w.inx {
-					xBuf[i] = X[inx][xBest]
-				}
-				xt := xBuf[:len(w.inx)]
+			if dBest > 1e-6 {
+				// partition w.inx into left/right
+				i := 0
+				j := len(w.inx)
 
-				l, r := partition(xt, w.inx, vBest)
+				for i < j {
+					if X[w.inx[i]][xBest] < vBest {
+						i++
+					} else {
+						j--
+						w.inx[j], w.inx[i] = w.inx[i], w.inx[j]
+					}
+				}
+
+				l, r := w.inx[:iBest], w.inx[iBest:]
 
 				n.Left = &Node{Samples: len(l)}
 				n.Right = &Node{Samples: len(r)}
@@ -360,11 +366,12 @@ func (t *Classifier) Load(r io.Reader) error {
 }
 
 // this function takes a lot of args
-// TODO: we are making a lot of garbage in this function, consider using buffers
-// for the classCtL and classCtR slices
-func (t *Classifier) bestSplit(xi []float64, y []int, classCount []int, dInit float64,
-	classCtL []int, classCtR []int) (float64, float64) {
+// classCtl and classCtr should be initialized by the caller, classCtL should
+// be all zeros, classCtr should be the counts for the current node
+func (t *Classifier) bestSplit(xi []float64, y []int, inx []int, dInit float64,
+	classCtL []int, classCtR []int) (float64, float64, int) {
 	var dBest, vBest, v, d float64
+	var pos int
 
 	n := len(xi)
 	nLeft := 0
@@ -372,11 +379,7 @@ func (t *Classifier) bestSplit(xi []float64, y []int, classCount []int, dInit fl
 	//classCtL := make([]int, len(classCount))
 	//classCtR := make([]int, len(classCount))
 	// all examples start in right split
-	copy(classCtR, classCount)
 	// zero class counts for left split
-	for i := range classCtL {
-		classCtL[i] = 0
-	}
 
 	var lastCtr int // last time the counters were incremented
 
@@ -386,12 +389,14 @@ func (t *Classifier) bestSplit(xi []float64, y []int, classCount []int, dInit fl
 		}
 
 		for j := lastCtr; j < i; j++ {
+			yVal := y[inx[j]]
+
 			// increment class count and n for examples moving to left
 			nLeft++
-			classCtL[y[j]]++
+			classCtL[yVal]++
 			// decrement class count and n for examples moving from right
 			nRight--
-			classCtR[y[j]]--
+			classCtR[yVal]--
 		}
 		lastCtr = i
 
@@ -413,10 +418,11 @@ func (t *Classifier) bestSplit(xi []float64, y []int, classCount []int, dInit fl
 		if d > dBest {
 			dBest = d
 			vBest = v
+			pos = nLeft
 		}
 
 	}
-	return vBest, dBest
+	return vBest, dBest, pos
 }
 
 // gini impurity
@@ -473,36 +479,4 @@ func (s *stack) Pop() *stackNode {
 	d := (*s)[len(*s)-1]
 	*s = (*s)[:len(*s)-1]
 	return d
-}
-
-// partition xt, and inx into left and right
-func partition(xt []float64, inx []int, x float64) ([]int, []int) {
-	i := 0
-	j := len(xt) - 1
-
-	for xt[i] <= x && i < j {
-		i++
-	}
-
-	for x < xt[j] && i < j {
-		j--
-	}
-
-	for i < j {
-		inx[i], inx[j] = inx[j], inx[i]
-		xt[i], xt[j] = xt[j], xt[i]
-		// yt[i], yt[j] = yt[j], yt[i]
-		i++
-		j--
-
-		for xt[i] <= x && i < j {
-			i++
-		}
-
-		for x < xt[j] && i < j {
-			j--
-		}
-	}
-
-	return inx[:j], inx[j:]
 }
