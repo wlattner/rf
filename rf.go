@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"encoding/csv"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -15,26 +14,40 @@ import (
 	"github.com/wlattner/rf/tree"
 
 	"github.com/davecheney/profile"
+	flag "github.com/docker/docker/pkg/mflag"
 )
 
 var (
-	nTree       = flag.Int("ntree", 10, "number of trees")
-	minSplit    = flag.Int("min-split", 2, "min examples for node to be split")
-	minLeaf     = flag.Int("min-leaf", 1, "min examples for leaf node")
-	maxDepth    = flag.Int("max-depth", -1, "max depth to grow trees")
-	maxFeatures = flag.Int("max-features", -1, "max number of features to consider at each split, -1 will default to sqrt(# features)")
-	impurity    = flag.String("impurity-measure", "gini", "impurity measure for evaluating splits")
-	dataFile    = flag.String("data", "", "csv file with training data")
-	predictFile = flag.String("predictions", "", "output file for predictions")
-	modelFile   = flag.String("model", "rf.model", "file to write/read model")
-	nWorkers    = flag.Int("workers", 1, "number of workers for fitting trees")
-	runProfile  = flag.Bool("profile", false, "cpu profile")
+	// model/prediction files
+	dataFile    = flag.String([]string{"d", "-data"}, "", "example data")
+	predictFile = flag.String([]string{"p", "-predictions"}, "", "file to output predictions")
+	modelFile   = flag.String([]string{"f", "-final_model"}, "rf.model", "file to output fitted model")
+	// model params
+	nTree       = flag.Int([]string{"-trees"}, 10, "number of trees")
+	minSplit    = flag.Int([]string{"-min_split"}, 2, "minimum number of samples required to split an internal node")
+	minLeaf     = flag.Int([]string{"-min_leaf"}, 1, " minimum number of samples in newly created leaves")
+	maxFeatures = flag.Int([]string{"-max_features"}, -1, "number of features to consider when looking for the best split, -1 will default to √(# features)")
+	impurity    = flag.String([]string{"-impurity"}, "gini", "impurity measure for evaluating splits")
+	// runtime params
+	nWorkers   = flag.Int([]string{"-workers"}, 1, "number of workers for fitting trees")
+	runProfile = flag.Bool([]string{"-profile"}, false, "cpu profile")
 )
 
-var impurityCode = map[string]tree.ImpurityMeasure{"gini": tree.Gini, "entropy": tree.Entropy}
+// lookup table for impurity measure
+var impurityCode = map[string]tree.ImpurityMeasure{
+	"gini":    tree.Gini,
+	"entropy": tree.Entropy,
+}
 
 func main() {
 	flag.Parse()
+
+	if *dataFile == "" && *predictFile == "" {
+		// nothing to do
+		fmt.Fprintf(os.Stderr, "Usage of rf:\n\n")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
 
 	if *nWorkers > 1 {
 		runtime.GOMAXPROCS(runtime.NumCPU())
@@ -44,26 +57,25 @@ func main() {
 		// is fit
 		f, err := os.Open(*dataFile)
 		if err != nil {
-			fmt.Println("error opening", *dataFile, err.Error())
+			fmt.Fprintln(os.Stderr, "error opening", *dataFile, err.Error())
 			os.Exit(1)
 		}
 		defer f.Close()
 
-		X, Y, err := parseCSV(f, true)
+		X, Y, err := parseCSV(f)
 		if err != nil {
-			fmt.Println("error parsing", err.Error())
+			fmt.Fprintln(os.Stderr, "error parsing", err.Error())
 			os.Exit(1)
 		}
 
 		imp, ok := impurityCode[*impurity]
 		if !ok {
-			fmt.Println("invalid impurity measure", *impurity)
+			fmt.Fprintln(os.Stderr, "invalid impurity measure", *impurity)
 			os.Exit(1)
 		}
 
 		clf := forest.NewClassifier(forest.NumTrees(*nTree), forest.MinSplit(*minSplit),
-			forest.MinLeaf(*minLeaf), forest.MaxDepth(*maxDepth),
-			forest.MaxFeatures(*maxFeatures), forest.Impurity(imp),
+			forest.MinLeaf(*minLeaf), forest.MaxFeatures(*maxFeatures), forest.Impurity(imp),
 			forest.NumWorkers(*nWorkers))
 
 		if *runProfile {
@@ -72,23 +84,23 @@ func main() {
 		start := time.Now()
 		clf.Fit(X, Y)
 		d := time.Since(start)
-		fmt.Printf("fitting took %.2fs\n", d.Seconds())
+		fmt.Fprintln(os.Stderr, "fitting took %.2fs\n", d.Seconds())
 
 		out, err := os.Create(*modelFile)
 		if err != nil {
-			fmt.Println("error creating", *modelFile, err.Error())
+			fmt.Fprintln(os.Stderr, "error creating", *modelFile, err.Error())
 			os.Exit(1)
 		}
 
 		err = clf.Save(out)
 		if err != nil {
-			fmt.Println("error writing model to", *modelFile, err.Error())
+			fmt.Fprintln(os.Stderr, "error writing model to", *modelFile, err.Error())
 			os.Exit(1)
 		}
 
 		err = out.Close()
 		if err != nil {
-			fmt.Println("error writing model to", *modelFile, err.Error())
+			fmt.Fprintln(os.Stderr, "error writing model to", *modelFile, err.Error())
 			os.Exit(1)
 		}
 
@@ -96,7 +108,7 @@ func main() {
 		// is predict
 		m, err := os.Open(*modelFile)
 		if err != nil {
-			fmt.Println("error opening model", *modelFile, err.Error())
+			fmt.Fprintln(os.Stderr, "error opening model", *modelFile, err.Error())
 			os.Exit(1)
 		}
 		defer m.Close()
@@ -106,14 +118,14 @@ func main() {
 
 		f, err := os.Open(*dataFile)
 		if err != nil {
-			fmt.Println("error opening", *dataFile, err.Error())
+			fmt.Fprintln(os.Stderr, "error opening", *dataFile, err.Error())
 			os.Exit(1)
 		}
 		defer f.Close()
 
-		X, _, err := parseCSV(f, false)
+		X, _, err := parseCSV(f)
 		if err != nil {
-			fmt.Println("error parsing", *dataFile, err.Error())
+			fmt.Fprintln(os.Stderr, "error parsing", *dataFile, err.Error())
 			os.Exit(1)
 		}
 
@@ -121,14 +133,14 @@ func main() {
 
 		out, err := os.Create(*predictFile)
 		if err != nil {
-			fmt.Println("error creating", *predictFile, err.Error())
+			fmt.Fprintln(os.Stderr, "error creating", *predictFile, err.Error())
 			os.Exit(1)
 		}
 		defer out.Close()
 
 		err = writePred(out, pred)
 		if err != nil {
-			fmt.Println("error writing", *predictFile, err.Error())
+			fmt.Fprintln(os.Stderr, "error writing", *predictFile, err.Error())
 			os.Exit(1)
 		}
 	}
@@ -152,7 +164,7 @@ func writePred(w io.Writer, prediction []string) error {
 	return wtr.Flush()
 }
 
-func parseCSV(r io.Reader, hasLabels bool) ([][]float64, []string, error) {
+func parseCSV(r io.Reader) ([][]float64, []string, error) {
 	reader := csv.NewReader(r)
 
 	var (
@@ -169,17 +181,10 @@ func parseCSV(r io.Reader, hasLabels bool) ([][]float64, []string, error) {
 			return X, Y, err
 		}
 
-		var (
-			col    int
-			rowVal []float64
-		)
+		Y = append(Y, row[0])
 
-		if hasLabels {
-			Y = append(Y, row[0])
-			col++
-		}
-
-		for _, val := range row[col:] {
+		var rowVal []float64
+		for _, val := range row[1:] { // data starts in 2nd column
 			fv, err := strconv.ParseFloat(val, 64)
 			if err != nil {
 				return X, Y, err

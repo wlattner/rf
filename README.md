@@ -30,53 +30,53 @@ A model can be fitted from a csv file, the label should be the first column and 
 Assuming these data are in a file named `iris.csv`, a model would be fitted with the following command:
 
 ```bash
-rf --data iris.csv --model iris.model
+rf -d iris.csv -f iris.model
 ```
 
 **Args**
 
-`--impurity` the measure to use for evaluating candidate splits, should be `gini` (default) or `entropy`
+`-d, --data arg` example data
 
-`--max-depth` the maximum depth to grow the trees, use `-1` (default) for full depth trees
+`-f --final_model arg (=rf.model)` file to output fitted model
 
-`--max-features` the number of features to consider at each split, `-1` (default) will use sqrt(# features)
+`--trees arg (=10)` number of trees to include in forest
 
-`--min-leaf` the minimum number of examples for a leaf node
+`--min_split arg (=2)` minimum number of samples required to split an internal node
 
-`--min-split` the minimum number of examples for a node to be split
+`--min_leaf arg (=1)` minimum number of samples in newly created leaves
 
-`--ntree` the number of trees to include in the forest
+`--max_features arg (=-1)`  number of features to consider when looking for the best split, -1 will default to √(# features)
 
-`--workers` the number of workers to use for fitting trees, should be less than number of cpus/cores
+`--impurity arg (=gini)` the measure to use for evaluating candidate splits, must be `gini` or `entropy`
 
-`--data` csv file containing training data
+`--workers arg (=1)` number of workers for fitting trees
 
-`--model` file to save the fitted model
 
 ### Predict
-Predictions can be made from a previously fitted model. The data for making predictions should be in a csv file with a format similar to the data used to fit the model, however, the first column should not have labels.
+Predictions can be made from a previously fitted model. The data for making predictions should be in a csv file with a format similar to the data used to fit the model, however, the first column will be ignored.
 
-	5.1,3.5,1.4,0.2
-	4.9,3,1.4,0.2
-	4.7,3.2,1.3,0.2
-	4.6,3.1,1.5,0.2
-	5,3.6,1.4,0.2
-	5.4,3.9,1.7,0.4
-	4.6,3.4,1.4,0.3
-	5,3.4,1.5,0.2
-	4.4,2.9,1.4,0.2
+	"",5.1,3.5,1.4,0.2
+	"",4.9,3,1.4,0.2
+	"",4.7,3.2,1.3,0.2
+	"",4.6,3.1,1.5,0.2
+	"",5,3.6,1.4,0.2
+	"",5.4,3.9,1.7,0.4
+	"",4.6,3.4,1.4,0.3
+	"",5,3.4,1.5,0.2
+	"",4.4,2.9,1.4,0.2
+	...
 
 ```bash
-rf --data iris_new.csv --predictions iris_predictions.csv --model iris.model
+rf -d iris.csv -p iris_predictions.csv -f iris.model
 ```
 
 **Args**
 
-`--data` csv file containing data for making predictions
+`-d, --data arg` example data
 
-`--predictions` file for writing predictions
+`-p, --predictions arg` file to output predictions
 
-`--model` location of previously fitted model file
+`-f, --final_model arg (=rf.model)` file with previously fitted model
 
 Docs
 ----
