@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"sort"
 	"strconv"
 	"time"
 
@@ -62,7 +63,7 @@ func main() {
 		}
 		defer f.Close()
 
-		X, Y, err := parseCSV(f)
+		X, Y, varNames, err := parseCSV(f)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "error parsing", err.Error())
 			os.Exit(1)
@@ -85,6 +86,8 @@ func main() {
 		clf.Fit(X, Y)
 		d := time.Since(start)
 		fmt.Fprintf(os.Stderr, "fitting took %.2fs\n", d.Seconds())
+
+		variableImportanceReport(clf, varNames)
 
 		out, err := os.Create(*modelFile)
 		if err != nil {
@@ -123,7 +126,7 @@ func main() {
 		}
 		defer f.Close()
 
-		X, _, err := parseCSV(f)
+		X, _, _, err := parseCSV(f)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "error parsing", *dataFile, err.Error())
 			os.Exit(1)
@@ -164,13 +167,54 @@ func writePred(w io.Writer, prediction []string) error {
 	return wtr.Flush()
 }
 
-func parseCSV(r io.Reader) ([][]float64, []string, error) {
+// parse csv file, detect if first row is header/has var names,
+// returns X, Y, varNames, error
+func parseCSV(r io.Reader) ([][]float64, []string, []string, error) {
 	reader := csv.NewReader(r)
 
 	var (
-		X [][]float64
-		Y []string
+		X        [][]float64
+		Y        []string
+		varNames []string
 	)
+
+	// check if the first row is header or data
+	var isHeader bool
+	header, err := reader.Read()
+	if err != nil {
+		return X, Y, varNames, err
+	}
+	// we only accept numeric input values, so we can consider the first row
+	// as a header row if one or more of the values isn't a number
+	if len(header) > 1 {
+		for _, val := range header[1:] {
+			_, err := strconv.ParseFloat(val, 64)
+			if err != nil {
+				isHeader = true
+				break
+			}
+		}
+	}
+
+	varNames = make([]string, len(header)-1)
+
+	if isHeader {
+		for i, name := range header[1:] {
+			varNames[i] = name
+		}
+	} else {
+		// parse as X, Y
+		Y = append(Y, header[0])
+		var rowVal []float64
+		for _, val := range header[1:] {
+			fv, err := strconv.ParseFloat(val, 64)
+			if err != nil {
+				return X, Y, varNames, err
+			}
+			rowVal = append(rowVal, fv)
+		}
+		X = append(X, rowVal)
+	}
 
 	for {
 		row, err := reader.Read()
@@ -178,7 +222,7 @@ func parseCSV(r io.Reader) ([][]float64, []string, error) {
 			break
 		}
 		if err != nil {
-			return X, Y, err
+			return X, Y, varNames, err
 		}
 
 		Y = append(Y, row[0])
@@ -187,13 +231,45 @@ func parseCSV(r io.Reader) ([][]float64, []string, error) {
 		for _, val := range row[1:] { // data starts in 2nd column
 			fv, err := strconv.ParseFloat(val, 64)
 			if err != nil {
-				return X, Y, err
+				return X, Y, varNames, err
 			}
 			rowVal = append(rowVal, fv)
 		}
 		X = append(X, rowVal)
 	}
 
-	return X, Y, nil
+	return X, Y, varNames, err
 
+}
+
+func variableImportanceReport(clf *forest.ForestClassifier, varNames []string) {
+	// variable importance
+	varImp := clf.VarImp()
+	sortByImportance(varImp, varNames)
+
+	for i, imp := range varImp {
+		fmt.Fprintf(os.Stderr, "%-15s: %-10.2f\n", varNames[i], imp)
+	}
+}
+
+type varImpSort struct {
+	varName []string
+	imp     []float64
+}
+
+func (v varImpSort) Len() int {
+	return len(v.imp)
+}
+
+func (v varImpSort) Less(i, j int) bool {
+	return v.imp[i] < v.imp[j]
+}
+
+func (v varImpSort) Swap(i, j int) {
+	v.imp[i], v.imp[j] = v.imp[j], v.imp[i]
+	v.varName[i], v.varName[j] = v.varName[j], v.varName[i]
+}
+
+func sortByImportance(imp []float64, names []string) {
+	sort.Sort(sort.Reverse(varImpSort{imp: imp, varName: names}))
 }
