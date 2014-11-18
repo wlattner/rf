@@ -20,34 +20,26 @@ func TestIrisFitPredict(t *testing.T) {
 		}
 	}
 
-	// fmt.Println(clf.ConfusionMatrix)
-
-	// confMat := make([][]int, len(clf.Classes))
-	// for i := range confMat {
-	// 	confMat[i] = make([]int, len(clf.Classes))
-	// }
-
-	// for i, className := range pred {
-	// 	actClassName := Y[i]
-
-	// 	var predClassID int
-	// 	var actClassID int
-	// 	for id, c := range clf.Classes {
-	// 		if c == className {
-	// 			predClassID = id
-	// 		}
-	// 		if c == actClassName {
-	// 			actClassID = id
-	// 		}
-	// 	}
-
-	// 	confMat[actClassID][predClassID]++
-	// }
-
-	// fmt.Println(confMat)
-
 	if correctFrac < 0.98 {
 		t.Errorf("expected accuracy on iris data to be at least 0.98, got: %f", correctFrac)
+	}
+}
+
+func TestIrisOOBError(t *testing.T) {
+	clf := NewClassifier(NumTrees(10), ComputeOOB())
+
+	clf.Fit(X, Y)
+
+	// check oob accuracy
+	if clf.Accuracy < 0.94 {
+		t.Errorf("expected oob accuracy to be at least 0.94, got: %f", clf.Accuracy)
+	}
+
+	// check confusion matrix
+	for i := range clf.ConfusionMatrix {
+		if clf.ConfusionMatrix[i][i] < 40 || clf.ConfusionMatrix[i][i] > 50 {
+			t.Errorf("expected confusion matrix entry to be at least 45 and less than 50, got: %d", clf.ConfusionMatrix[i][i])
+		}
 	}
 }
 

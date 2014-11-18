@@ -27,6 +27,7 @@ type ForestClassifier struct {
 	nWorkers        int
 	computeOOB      bool
 	ConfusionMatrix [][]int
+	Accuracy        float64
 }
 
 // methods for the forestConfiger interface
@@ -164,6 +165,11 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 		f.MaxFeatures = int(math.Sqrt(float64(len(X[0]))))
 	}
 
+	var oobClassCtr *oobCtr
+	if f.computeOOB {
+		oobClassCtr = newOOBCtr(len(Y), len(f.Classes))
+	}
+
 	in := make(chan *fitTree)
 	out := make(chan *fitTree)
 
@@ -171,6 +177,7 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 	if nWorkers < 1 {
 		nWorkers = 1
 	}
+
 	// start workers
 	for i := 0; i < nWorkers; i++ {
 		go func(id int) {
@@ -183,8 +190,9 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 				w.t = clf
 
 				if f.computeOOB {
-					w.confMat = oobConfusionMat(X, yIDs, w.inBag, w.t)
+					oobClassCtr.update(X, w.inBag, w.t)
 				}
+
 				out <- w
 			}
 		}(i)
@@ -199,23 +207,13 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 		close(in)
 	}()
 
-	if f.computeOOB {
-		for _ = range f.Classes {
-			f.ConfusionMatrix = append(f.ConfusionMatrix, make([]int, len(f.Classes)))
-		}
-	}
-
 	for i := range f.Trees {
 		w := <-out
 		f.Trees[i] = w.t
+	}
 
-		if f.computeOOB {
-			for row := range w.confMat {
-				for col := range w.confMat {
-					f.ConfusionMatrix[row][col] += w.confMat[row][col]
-				}
-			}
-		}
+	if f.computeOOB {
+		f.ConfusionMatrix, f.Accuracy = oobClassCtr.compute(yIDs)
 	}
 }
 
@@ -276,10 +274,9 @@ func (f *ForestClassifier) Load(r io.Reader) error {
 }
 
 type fitTree struct {
-	t       *tree.Classifier
-	inx     []int
-	inBag   []bool
-	confMat [][]int
+	t     *tree.Classifier
+	inx   []int
+	inBag []bool
 }
 
 func bootstrapInx(n int) ([]int, []bool) {
@@ -293,8 +290,21 @@ func bootstrapInx(n int) ([]int, []bool) {
 	return inx, inBag
 }
 
-func oobConfusionMat(X [][]float64, Y []int, inBag []bool, t *tree.Classifier) [][]int {
-	// find the indices not inBag
+type oobCtr struct {
+	classVotes [][]int // array of nExample x nClasses
+}
+
+func newOOBCtr(nExample, nClasses int) *oobCtr {
+	classVotes := make([][]int, nExample)
+	for i := range classVotes {
+		classVotes[i] = make([]int, nClasses)
+	}
+	m := oobCtr{classVotes: classVotes}
+	return &m
+}
+
+// accumulate oob predictions for a tree
+func (o *oobCtr) update(X [][]float64, inBag []bool, t *tree.Classifier) {
 	var inx []int
 	for i, in := range inBag {
 		if !in {
@@ -302,16 +312,39 @@ func oobConfusionMat(X [][]float64, Y []int, inBag []bool, t *tree.Classifier) [
 		}
 	}
 
-	confusionMat := make([][]int, len(t.Classes))
-	for i := range confusionMat {
-		confusionMat[i] = make([]int, len(t.Classes))
-	}
-
 	pred := t.PredictID(X, inx)
 
-	for i, id := range inx {
-		confusionMat[Y[id]][pred[i]]++
+	for i, sampleInx := range inx {
+		o.classVotes[sampleInx][pred[i]]++
+	}
+}
+
+// compute confusion matrix and overall accuracy from oob predictions
+func (o *oobCtr) compute(Y []int) ([][]int, float64) {
+	confMat := make([][]int, len(o.classVotes[0]))
+	for i := range confMat {
+		confMat[i] = make([]int, len(o.classVotes[0]))
 	}
 
-	return confusionMat
+	for i, actual := range Y {
+		// find max vote from forest
+		maxClass := 0
+		maxVotes := 0
+		for class, nVotes := range o.classVotes[i] {
+			if nVotes > maxVotes {
+				maxVotes = nVotes
+				maxClass = class
+			}
+		}
+
+		confMat[actual][maxClass]++
+	}
+
+	correctCt := 0
+	for i := range confMat {
+		correctCt += confMat[i][i]
+	}
+	accuracy := float64(correctCt) / float64(len(Y))
+
+	return confMat, accuracy
 }
