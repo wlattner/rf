@@ -77,15 +77,15 @@ func main() {
 
 		clf := forest.NewClassifier(forest.NumTrees(*nTree), forest.MinSplit(*minSplit),
 			forest.MinLeaf(*minLeaf), forest.MaxFeatures(*maxFeatures), forest.Impurity(imp),
-			forest.NumWorkers(*nWorkers))
+			forest.NumWorkers(*nWorkers), forest.ComputeOOB)
 
 		if *runProfile {
 			defer profile.Start(profile.CPUProfile).Stop()
 		}
 		start := time.Now()
 		clf.Fit(X, Y)
-		d := time.Since(start)
-		fmt.Fprintf(os.Stderr, "fitting took %.2fs\n", d.Seconds())
+
+		report(clf, time.Since(start))
 
 		variableImportanceReport(clf, varNames)
 
@@ -282,4 +282,31 @@ func classNames(ids []int, classes []string) []string {
 	}
 
 	return names
+}
+
+func report(clf *forest.Classifier, tTime time.Duration) {
+	fmt.Fprintf(os.Stderr, "Fit %d trees using %d examples in %.2f seconds\n", clf.NTrees, clf.NSample, tTime.Seconds())
+	fmt.Fprintf(os.Stderr, "\n")
+
+	// print confusion matrix
+	// headers
+	fmt.Fprintf(os.Stderr, "%-14s ", "")
+	for _, class := range clf.Classes {
+		fmt.Fprintf(os.Stderr, "%-14s ", class)
+	}
+	fmt.Fprintf(os.Stderr, "\n")
+
+	// rows
+	for predictedID, class := range clf.Classes {
+		fmt.Fprintf(os.Stderr, "%-14s ", class)
+
+		for actualID := range clf.Classes {
+			fmt.Fprintf(os.Stderr, "%-14d ", clf.ConfusionMatrix[actualID][predictedID])
+		}
+
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "OOB Accuracy: %.2f%%\n", 100.0*clf.Accuracy)
 }

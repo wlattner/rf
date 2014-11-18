@@ -40,6 +40,24 @@ func TestIrisVariableImportance(t *testing.T) {
 	}
 }
 
+func TestIrisOOBError(t *testing.T) {
+	clf := NewClassifier(NumTrees(10), ComputeOOB)
+
+	clf.Fit(X, Y)
+
+	// check oob accuracy
+	if clf.Accuracy < 0.90 {
+		t.Errorf("expected oob accuracy to be at least 0.90, got: %f", clf.Accuracy)
+	}
+
+	// check confusion matrix
+	for i := range clf.ConfusionMatrix {
+		if clf.ConfusionMatrix[i][i] < 40 || clf.ConfusionMatrix[i][i] > 50 {
+			t.Errorf("expected confusion matrix entry to be at least 45 and less than 50, got: %d", clf.ConfusionMatrix[i][i])
+		}
+	}
+}
+
 func TestEncodeDecode(t *testing.T) {
 	clf := NewClassifier(NumTrees(10))
 

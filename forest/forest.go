@@ -21,16 +21,20 @@ func init() {
 }
 
 type Classifier struct {
-	NTrees      int
-	MinSplit    int
-	MinLeaf     int
-	MaxDepth    int
-	MaxFeatures int
-	Classes     []string
-	Trees       []*tree.Classifier
-	impurity    tree.ImpurityMeasure
-	nWorkers    int
-	nFeatures   int
+	NTrees          int
+	MinSplit        int
+	MinLeaf         int
+	MaxDepth        int
+	MaxFeatures     int
+	Classes         []string
+	Trees           []*tree.Classifier
+	impurity        tree.ImpurityMeasure
+	nWorkers        int
+	computeOOB      bool
+	ConfusionMatrix [][]int
+	Accuracy        float64
+	NSample         int
+	nFeatures       int
 }
 
 // methods for the forestConfiger interface
@@ -41,6 +45,7 @@ func (c *Classifier) setImpurity(f tree.ImpurityMeasure) { c.impurity = f }
 func (c *Classifier) setMaxFeatures(n int)               { c.MaxFeatures = n }
 func (c *Classifier) setNumTrees(n int)                  { c.NTrees = n }
 func (c *Classifier) setNumWorkers(n int)                { c.nWorkers = n }
+func (c *Classifier) setComputeOOB()                     { c.computeOOB = true }
 
 type forestConfiger interface {
 	setMinSplit(n int)
@@ -50,6 +55,7 @@ type forestConfiger interface {
 	setMaxFeatures(n int)
 	setNumTrees(n int)
 	setNumWorkers(n int)
+	setComputeOOB()
 }
 
 var (
@@ -111,6 +117,12 @@ func NumWorkers(n int) func(forestConfiger) {
 	}
 }
 
+// ComputeOOB computes the confusion matrix from out of bag samples
+// for each tree.
+func ComputeOOB(c forestConfiger) {
+	c.setComputeOOB()
+}
+
 // NewClassifier returns a configured/initialized random forest classifier.
 // If no options are passed, the returned Classifier will be equivalent to
 // the following call:
@@ -151,6 +163,7 @@ func (f *Classifier) Fit(X [][]float64, Y []string) {
 		yIDs = append(yIDs, id)
 	}
 	f.Classes = classes
+	f.NSample = len(yIDs)
 
 	f.nFeatures = len(X[0])
 
@@ -160,22 +173,35 @@ func (f *Classifier) Fit(X [][]float64, Y []string) {
 		f.MaxFeatures = int(math.Sqrt(float64(f.nFeatures)))
 	}
 
-	in := make(chan []int)
-	out := make(chan *tree.Classifier)
+	var oobClassCtr *oobCtr
+	if f.computeOOB {
+		oobClassCtr = newOOBCtr(len(Y), len(f.Classes))
+	}
+
+	in := make(chan *fitTree)
+	out := make(chan *fitTree)
 
 	nWorkers := f.nWorkers
 	if nWorkers < 1 {
 		nWorkers = 1
 	}
+
 	// start workers
 	for i := 0; i < nWorkers; i++ {
 		go func(id int) {
-			for inx := range in {
+			for w := range in {
 				clf := tree.NewClassifier(tree.MinSplit(f.MinSplit), tree.MinLeaf(f.MinLeaf),
-					tree.MaxDepth(f.MaxDepth), tree.Impurity(f.impurity),
-					tree.MaxFeatures(f.MaxFeatures), tree.RandState(int64(id)*time.Now().UnixNano()))
-				clf.FitInx(X, yIDs, inx, classes)
-				out <- clf
+					tree.MaxDepth(f.MaxDepth), tree.Impurity(f.impurity), tree.MaxFeatures(f.MaxFeatures),
+					tree.RandState(int64(id)*time.Now().UnixNano()))
+				clf.FitInx(X, yIDs, w.inx, classes)
+
+				w.t = clf
+
+				if f.computeOOB {
+					oobClassCtr.update(X, w.inBag, w.t)
+				}
+
+				out <- w
 			}
 		}(i)
 	}
@@ -183,14 +209,19 @@ func (f *Classifier) Fit(X [][]float64, Y []string) {
 	// fill the queue
 	go func() {
 		for _ = range f.Trees {
-			inx := bootstrapInx(len(X))
-			in <- inx
+			inx, inBag := bootstrapInx(len(X))
+			in <- &fitTree{inx: inx, inBag: inBag}
 		}
 		close(in)
 	}()
 
 	for i := range f.Trees {
-		f.Trees[i] = <-out
+		w := <-out
+		f.Trees[i] = w.t
+	}
+
+	if f.computeOOB {
+		f.ConfusionMatrix, f.Accuracy = oobClassCtr.compute(yIDs)
 	}
 }
 
@@ -270,10 +301,78 @@ func (f *Classifier) Load(r io.Reader) error {
 	return d.Decode(f)
 }
 
-func bootstrapInx(n int) []int {
+type fitTree struct {
+	t     *tree.Classifier
+	inx   []int
+	inBag []bool
+}
+
+func bootstrapInx(n int) ([]int, []bool) {
+	inBag := make([]bool, n)
 	inx := make([]int, n)
 	for i := range inx {
-		inx[i] = rand.Intn(n)
+		id := rand.Intn(n)
+		inx[i] = id
+		inBag[id] = true
 	}
-	return inx
+	return inx, inBag
+}
+
+type oobCtr struct {
+	classVotes [][]int // array of nExample x nClasses
+}
+
+func newOOBCtr(nExample, nClasses int) *oobCtr {
+	classVotes := make([][]int, nExample)
+	for i := range classVotes {
+		classVotes[i] = make([]int, nClasses)
+	}
+	m := oobCtr{classVotes: classVotes}
+	return &m
+}
+
+// accumulate oob predictions for a tree
+func (o *oobCtr) update(X [][]float64, inBag []bool, t *tree.Classifier) {
+	var inx []int
+	for i, in := range inBag {
+		if !in {
+			inx = append(inx, i)
+		}
+	}
+
+	pred := t.PredictID(X, inx)
+
+	for i, sampleInx := range inx {
+		o.classVotes[sampleInx][pred[i]]++
+	}
+}
+
+// compute confusion matrix and overall accuracy from oob predictions
+func (o *oobCtr) compute(Y []int) ([][]int, float64) {
+	confMat := make([][]int, len(o.classVotes[0]))
+	for i := range confMat {
+		confMat[i] = make([]int, len(o.classVotes[0]))
+	}
+
+	for i, actual := range Y {
+		// find max vote from forest
+		maxClass := 0
+		maxVotes := 0
+		for class, nVotes := range o.classVotes[i] {
+			if nVotes > maxVotes {
+				maxVotes = nVotes
+				maxClass = class
+			}
+		}
+
+		confMat[actual][maxClass]++
+	}
+
+	correctCt := 0
+	for i := range confMat {
+		correctCt += confMat[i][i]
+	}
+	accuracy := float64(correctCt) / float64(len(Y))
+
+	return confMat, accuracy
 }
