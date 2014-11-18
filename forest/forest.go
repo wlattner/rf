@@ -25,6 +25,7 @@ type ForestClassifier struct {
 	Trees       []*tree.Classifier
 	impurity    tree.ImpurityMeasure
 	nWorkers    int
+	nFeatures   int
 }
 
 // methods for the forestConfiger interface
@@ -146,10 +147,12 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 	}
 	f.Classes = classes
 
+	f.nFeatures = len(X[0])
+
 	f.Trees = make([]*tree.Classifier, f.NTrees)
 
 	if f.MaxFeatures < 0 {
-		f.MaxFeatures = int(math.Sqrt(float64(len(X[0]))))
+		f.MaxFeatures = int(math.Sqrt(float64(f.nFeatures)))
 	}
 
 	in := make(chan []int)
@@ -230,6 +233,18 @@ func (f *ForestClassifier) PredictProb(X [][]float64) [][]float64 {
 	}
 
 	return probs
+}
+
+func (f *ForestClassifier) VarImp() []float64 {
+	imp := make([]float64, f.nFeatures)
+
+	for _, t := range f.Trees {
+		for inx, importance := range t.VarImp() {
+			imp[inx] += importance / float64(f.NTrees)
+		}
+	}
+
+	return imp
 }
 
 func (f *ForestClassifier) Save(w io.Writer) error {

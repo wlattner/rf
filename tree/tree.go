@@ -33,6 +33,7 @@ type Classifier struct {
 	Classes     []string
 	impurityFn  func(int, []int) float64
 	randState   *rand.Rand
+	nFeatures   int
 }
 
 // methods for the treeConfiger interface
@@ -172,11 +173,11 @@ func (t *Classifier) fit(X [][]float64, Y []int, inx []int, classes []string) {
 
 	t.Classes = classes
 
-	nFeatures := len(X[0])
+	t.nFeatures = len(X[0])
 
 	maxFeatures := t.MaxFeatures
 	if maxFeatures < 0 {
-		maxFeatures = nFeatures
+		maxFeatures = t.nFeatures
 	}
 
 	features := make([]int, len(X[0]))
@@ -221,7 +222,7 @@ func (t *Classifier) fit(X [][]float64, Y []int, inx []int, classes []string) {
 
 			// sample from maxFeatures from features using Fisher-Yates,
 			// Algorithm P, Knuth, The Art of Computer Programming Vol. 2, p. 145
-			j := nFeatures - 1
+			j := t.nFeatures - 1
 			visited := 0
 			for j > 0 && visited < maxFeatures {
 				u := rand.Float64()
@@ -249,7 +250,7 @@ func (t *Classifier) fit(X [][]float64, Y []int, inx []int, classes []string) {
 				//TODO: find a better way to share the constant feature list with
 				// child nodes
 				if xt[len(xt)-1] <= xt[0]+1e-7 {
-					c := make([]bool, nFeatures)
+					c := make([]bool, t.nFeatures)
 					copy(c, w.constantFeatures)
 					c[currentFeature] = true
 					w.constantFeatures = c
@@ -352,6 +353,40 @@ func (t *Classifier) PredictProb(X [][]float64) [][]float64 {
 		p[i] = row
 	}
 	return p
+}
+
+func (t *Classifier) VarImp() []float64 {
+	imp := make([]float64, t.nFeatures)
+
+	var s stack
+	s.Push(&stackNode{node: t.Root})
+
+	for !s.Empty() {
+		n := s.Pop()
+
+		if !n.node.Leaf {
+			imp[n.node.SplitVar] += (float64(n.node.Samples)*n.node.Impurity -
+				float64(n.node.Right.Samples)*n.node.Right.Impurity -
+				float64(n.node.Left.Samples)*n.node.Left.Impurity)
+
+			s.Push(&stackNode{node: n.node.Left})
+			s.Push(&stackNode{node: n.node.Right})
+		}
+	}
+
+	nSamples := float64(t.Root.Samples)
+	total := 0.0
+	for i := range imp {
+		imp[i] /= nSamples
+		total += imp[i]
+	}
+
+	// normalize
+	for i := range imp {
+		imp[i] /= total
+	}
+
+	return imp
 }
 
 // Save serializes the Classifier using encoding/gob to an io.Writer.

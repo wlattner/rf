@@ -2,6 +2,7 @@ package forest
 
 import (
 	"bytes"
+	"math"
 	"testing"
 )
 
@@ -22,6 +23,20 @@ func TestIrisFitPredict(t *testing.T) {
 
 	if correctFrac < 0.98 {
 		t.Errorf("expected accuracy on iris data to be at least 0.98, got: %f", correctFrac)
+	}
+}
+
+func TestIrisVariableImportance(t *testing.T) {
+	clf := NewClassifier(NumTrees(10))
+	clf.Fit(X, Y)
+
+	sum := 0.0
+	for _, val := range clf.VarImp() {
+		sum += val
+	}
+
+	if math.Abs(sum-1.0) > 1e-7 {
+		t.Error("expected variable importance to sum to 1, got:", sum)
 	}
 }
 
