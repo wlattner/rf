@@ -15,7 +15,7 @@ func TestIrisFitPredict(t *testing.T) {
 	correctFrac := 0.0
 	contrib := 1.0 / float64(len(pred))
 	for i := range Y {
-		if Y[i] == pred[i] {
+		if Y[i] == clf.Classes[pred[i]] {
 			correctFrac += contrib
 		}
 	}
@@ -41,7 +41,7 @@ func TestEncodeDecode(t *testing.T) {
 	correctFrac := 0.0
 	contrib := 1.0 / float64(len(pred))
 	for i := range Y {
-		if Y[i] == pred[i] {
+		if Y[i] == clf.Classes[pred[i]] {
 			correctFrac += contrib
 		}
 	}
