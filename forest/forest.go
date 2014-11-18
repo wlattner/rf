@@ -11,11 +11,16 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"time"
 
 	"github.com/wlattner/rf/tree"
 )
 
-type ForestClassifier struct {
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+type Classifier struct {
 	NTrees          int
 	MinSplit        int
 	MinLeaf         int
@@ -31,14 +36,14 @@ type ForestClassifier struct {
 }
 
 // methods for the forestConfiger interface
-func (c *ForestClassifier) setMinSplit(n int)                  { c.MinSplit = n }
-func (c *ForestClassifier) setMinLeaf(n int)                   { c.MinLeaf = n }
-func (c *ForestClassifier) setMaxDepth(n int)                  { c.MaxDepth = n }
-func (c *ForestClassifier) setImpurity(f tree.ImpurityMeasure) { c.impurity = f }
-func (c *ForestClassifier) setMaxFeatures(n int)               { c.MaxFeatures = n }
-func (c *ForestClassifier) setNumTrees(n int)                  { c.NTrees = n }
-func (c *ForestClassifier) setNumWorkers(n int)                { c.nWorkers = n }
-func (c *ForestClassifier) setComputeOOB()                     { c.computeOOB = true }
+func (c *Classifier) setMinSplit(n int)                  { c.MinSplit = n }
+func (c *Classifier) setMinLeaf(n int)                   { c.MinLeaf = n }
+func (c *Classifier) setMaxDepth(n int)                  { c.MaxDepth = n }
+func (c *Classifier) setImpurity(f tree.ImpurityMeasure) { c.impurity = f }
+func (c *Classifier) setMaxFeatures(n int)               { c.MaxFeatures = n }
+func (c *Classifier) setNumTrees(n int)                  { c.NTrees = n }
+func (c *Classifier) setNumWorkers(n int)                { c.nWorkers = n }
+func (c *Classifier) setComputeOOB()                     { c.computeOOB = true }
 
 type forestConfiger interface {
 	setMinSplit(n int)
@@ -124,8 +129,8 @@ func ComputeOOB() func(forestConfiger) {
 //
 //	clf := NewClassifier(NumTrees(10), MaxFeatures(-1), MinSplit(2), MinLeaf(1),
 //		MaxDepth(-1), Impurity(Gini), NumWorkers(1))
-func NewClassifier(options ...func(forestConfiger)) *ForestClassifier {
-	f := &ForestClassifier{
+func NewClassifier(options ...func(forestConfiger)) *Classifier {
+	f := &Classifier{
 		NTrees:      10,
 		MaxFeatures: -1,
 		MinSplit:    2,
@@ -143,7 +148,7 @@ func NewClassifier(options ...func(forestConfiger)) *ForestClassifier {
 
 // Fit constructs a forest from fitting n trees from the provided features X, and
 // labels Y.
-func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
+func (f *Classifier) Fit(X [][]float64, Y []string) {
 	// labels as integer ids, ensure all trees know about all classes
 	var yIDs []int
 	uniq := make(map[string]int)
@@ -183,8 +188,8 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 		go func(id int) {
 			for w := range in {
 				clf := tree.NewClassifier(tree.MinSplit(f.MinSplit), tree.MinLeaf(f.MinLeaf),
-					tree.MaxDepth(f.MaxDepth), tree.Impurity(f.impurity),
-					tree.MaxFeatures(f.MaxFeatures), tree.RandState(int64(id)))
+					tree.MaxDepth(f.MaxDepth), tree.Impurity(f.impurity), tree.MaxFeatures(f.MaxFeatures),
+					tree.RandState(int64(id)*time.Now().UnixNano()))
 				clf.FitInx(X, yIDs, w.inx, classes)
 
 				w.t = clf
@@ -217,33 +222,41 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 	}
 }
 
-// Predict returns the most probable label for each example.
-func (f *ForestClassifier) Predict(X [][]float64) []string {
-	p := f.PredictProb(X)
-	maxC := make([]string, len(X))
-
-	for i := range maxC {
-		// find the max vote
-		var (
-			maxP float64
-			maxJ int
-		)
-
-		for j := range p[i] {
-			if p[i][j] > maxP {
-				maxP = p[i][j]
-				maxJ = j
-			}
-		}
-		maxC[i] = f.Classes[maxJ]
+// Predict returns the most probable class id for each example. The id
+// corresponds to the index of the class label in Classifier.Classes.
+func (f *Classifier) Predict(X [][]float64) []int {
+	classVotes := make([][]int, len(X))
+	for i := range classVotes {
+		classVotes[i] = make([]int, len(f.Classes))
 	}
 
-	return maxC
+	for _, t := range f.Trees {
+		for i, class := range t.Predict(X) {
+			classVotes[i][class]++
+		}
+	}
+
+	// find max class for each example
+	maxClass := make([]int, len(X))
+
+	for i := range maxClass {
+		maxCt := 0
+		maxC := 0
+		for class, count := range classVotes[i] {
+			if count > maxCt {
+				maxCt = count
+				maxC = class
+			}
+		}
+		maxClass[i] = maxC
+	}
+
+	return maxClass
 }
 
 // PredictProb returns the class probability for each example. The indices of the
 // return value correspond to Classifier.Classes.
-func (f *ForestClassifier) PredictProb(X [][]float64) [][]float64 {
+func (f *Classifier) PredictProb(X [][]float64) [][]float64 {
 	//TODO: weighted voting...
 	probs := make([][]float64, len(X))
 	// initialize the other dim
@@ -263,12 +276,12 @@ func (f *ForestClassifier) PredictProb(X [][]float64) [][]float64 {
 	return probs
 }
 
-func (f *ForestClassifier) Save(w io.Writer) error {
+func (f *Classifier) Save(w io.Writer) error {
 	e := gob.NewEncoder(w)
 	return e.Encode(f)
 }
 
-func (f *ForestClassifier) Load(r io.Reader) error {
+func (f *Classifier) Load(r io.Reader) error {
 	d := gob.NewDecoder(r)
 	return d.Decode(f)
 }
