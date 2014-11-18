@@ -133,6 +133,7 @@ func main() {
 		}
 
 		pred := clf.Predict(X)
+		predLabels := classNames(pred, clf.Classes)
 
 		out, err := os.Create(*predictFile)
 		if err != nil {
@@ -141,7 +142,7 @@ func main() {
 		}
 		defer out.Close()
 
-		err = writePred(out, pred)
+		err = writePred(out, predLabels)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "error writing", *predictFile, err.Error())
 			os.Exit(1)
@@ -242,7 +243,7 @@ func parseCSV(r io.Reader) ([][]float64, []string, []string, error) {
 
 }
 
-func variableImportanceReport(clf *forest.ForestClassifier, varNames []string) {
+func variableImportanceReport(clf *forest.Classifier, varNames []string) {
 	// variable importance
 	varImp := clf.VarImp()
 	sortByImportance(varImp, varNames)
@@ -272,4 +273,13 @@ func (v varImpSort) Swap(i, j int) {
 
 func sortByImportance(imp []float64, names []string) {
 	sort.Sort(sort.Reverse(varImpSort{imp: imp, varName: names}))
+}
+
+func classNames(ids []int, classes []string) []string {
+	names := make([]string, len(ids))
+	for i, id := range ids {
+		names[i] = classes[id]
+	}
+
+	return names
 }

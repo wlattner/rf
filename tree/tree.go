@@ -225,7 +225,7 @@ func (t *Classifier) fit(X [][]float64, Y []int, inx []int, classes []string) {
 			j := t.nFeatures - 1
 			visited := 0
 			for j > 0 && visited < maxFeatures {
-				u := rand.Float64()
+				u := t.randState.Float64()
 				k := int(float64(j) * u)
 				features[k], features[j] = features[j], features[k]
 
@@ -303,9 +303,10 @@ func (t *Classifier) fit(X [][]float64, Y []int, inx []int, classes []string) {
 	}
 }
 
-// Predict returns the most probable label for each example.
-func (t *Classifier) Predict(X [][]float64) []string {
-	p := make([]string, len(X))
+// Predict returns the most probable class id for each example. The id
+// corresponds to the index of the class label in Classifier.Classes
+func (t *Classifier) Predict(X [][]float64) []int {
+	p := make([]int, len(X))
 
 	for i := range p {
 		n := t.Root
@@ -325,7 +326,7 @@ func (t *Classifier) Predict(X [][]float64) []string {
 				maxC = class
 			}
 		}
-		p[i] = t.Classes[maxC]
+		p[i] = maxC
 	}
 
 	return p
