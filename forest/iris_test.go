@@ -31,8 +31,8 @@ func TestIrisOOBError(t *testing.T) {
 	clf.Fit(X, Y)
 
 	// check oob accuracy
-	if clf.Accuracy < 0.94 {
-		t.Errorf("expected oob accuracy to be at least 0.94, got: %f", clf.Accuracy)
+	if clf.Accuracy < 0.90 {
+		t.Errorf("expected oob accuracy to be at least 0.90, got: %f", clf.Accuracy)
 	}
 
 	// check confusion matrix
