@@ -85,9 +85,7 @@ func main() {
 		start := time.Now()
 		clf.Fit(X, Y)
 
-		report(clf, time.Since(start))
-
-		variableImportanceReport(clf, varNames)
+		report(clf, varNames, time.Since(start))
 
 		out, err := os.Create(*modelFile)
 		if err != nil {
@@ -243,16 +241,6 @@ func parseCSV(r io.Reader) ([][]float64, []string, []string, error) {
 
 }
 
-func variableImportanceReport(clf *forest.Classifier, varNames []string) {
-	// variable importance
-	varImp := clf.VarImp()
-	sortByImportance(varImp, varNames)
-
-	for i, imp := range varImp {
-		fmt.Fprintf(os.Stderr, "%-15s: %-10.2f\n", varNames[i], imp)
-	}
-}
-
 type varImpSort struct {
 	varName []string
 	imp     []float64
@@ -284,10 +272,25 @@ func classNames(ids []int, classes []string) []string {
 	return names
 }
 
-func report(clf *forest.Classifier, tTime time.Duration) {
+func report(clf *forest.Classifier, varNames []string, tTime time.Duration) {
 	fmt.Fprintf(os.Stderr, "Fit %d trees using %d examples in %.2f seconds\n", clf.NTrees, clf.NSample, tTime.Seconds())
 	fmt.Fprintf(os.Stderr, "\n")
 
+	// print variable importance
+	fmt.Fprintf(os.Stderr, "Variable Importance\n")
+	fmt.Fprintf(os.Stderr, "-------------------\n")
+
+	varImp := clf.VarImp()
+	sortByImportance(varImp, varNames)
+
+	for i, imp := range varImp {
+		fmt.Fprintf(os.Stderr, "%-15s: %-10.2f\n", varNames[i], imp)
+	}
+
+	fmt.Fprintf(os.Stderr, "\n")
+
+	fmt.Fprintf(os.Stderr, "Confusion Matrix\n")
+	fmt.Fprintf(os.Stderr, "----------------\n")
 	// print confusion matrix
 	// headers
 	fmt.Fprintf(os.Stderr, "%-14s ", "")
