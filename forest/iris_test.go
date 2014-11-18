@@ -6,7 +6,7 @@ import (
 )
 
 func TestIrisFitPredict(t *testing.T) {
-	clf := NewClassifier(NumTrees(10), ComputeOOB())
+	clf := NewClassifier(NumTrees(10))
 
 	clf.Fit(X, Y)
 
@@ -26,7 +26,7 @@ func TestIrisFitPredict(t *testing.T) {
 }
 
 func TestIrisOOBError(t *testing.T) {
-	clf := NewClassifier(NumTrees(10), ComputeOOB())
+	clf := NewClassifier(NumTrees(10), ComputeOOB)
 
 	clf.Fit(X, Y)
 

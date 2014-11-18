@@ -33,6 +33,7 @@ type Classifier struct {
 	computeOOB      bool
 	ConfusionMatrix [][]int
 	Accuracy        float64
+	NSample         int
 }
 
 // methods for the forestConfiger interface
@@ -117,10 +118,8 @@ func NumWorkers(n int) func(forestConfiger) {
 
 // ComputeOOB computes the confusion matrix from out of bag samples
 // for each tree.
-func ComputeOOB() func(forestConfiger) {
-	return func(c forestConfiger) {
-		c.setComputeOOB()
-	}
+func ComputeOOB(c forestConfiger) {
+	c.setComputeOOB()
 }
 
 // NewClassifier returns a configured/initialized random forest classifier.
@@ -163,6 +162,7 @@ func (f *Classifier) Fit(X [][]float64, Y []string) {
 		yIDs = append(yIDs, id)
 	}
 	f.Classes = classes
+	f.NSample = len(yIDs)
 
 	f.Trees = make([]*tree.Classifier, f.NTrees)
 
