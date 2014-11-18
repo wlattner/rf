@@ -18,15 +18,18 @@ import (
 	flag "github.com/docker/docker/pkg/mflag"
 )
 
+//TODO: this isn't exactly well written...
+
 var (
 	// model/prediction files
 	dataFile    = flag.String([]string{"d", "-data"}, "", "example data")
 	predictFile = flag.String([]string{"p", "-predictions"}, "", "file to output predictions")
 	modelFile   = flag.String([]string{"f", "-final_model"}, "rf.model", "file to output fitted model")
+	impFile     = flag.String([]string{"-var_importance"}, "", "file to output variable importance estimates")
 	// model params
 	nTree       = flag.Int([]string{"-trees"}, 10, "number of trees")
 	minSplit    = flag.Int([]string{"-min_split"}, 2, "minimum number of samples required to split an internal node")
-	minLeaf     = flag.Int([]string{"-min_leaf"}, 1, " minimum number of samples in newly created leaves")
+	minLeaf     = flag.Int([]string{"-min_leaf"}, 1, "minimum number of samples in newly created leaves")
 	maxFeatures = flag.Int([]string{"-max_features"}, -1, "number of features to consider when looking for the best split, -1 will default to √(# features)")
 	impurity    = flag.String([]string{"-impurity"}, "gini", "impurity measure for evaluating splits")
 	// runtime params
@@ -85,7 +88,11 @@ func main() {
 		start := time.Now()
 		clf.Fit(X, Y)
 
-		report(clf, varNames, time.Since(start))
+		// don't sort the orig slice
+		sortedVarNames := make([]string, len(varNames))
+		copy(sortedVarNames, varNames)
+
+		report(clf, sortedVarNames, time.Since(start))
 
 		out, err := os.Create(*modelFile)
 		if err != nil {
@@ -103,6 +110,26 @@ func main() {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "error writing model to", *modelFile, err.Error())
 			os.Exit(1)
+		}
+
+		if *impFile != "" {
+			out, err := os.Create(*impFile)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "error creating", *impFile, err.Error())
+				os.Exit(1)
+			}
+			defer out.Close()
+
+			writer := csv.NewWriter(out)
+
+			varImp := clf.VarImp()
+			sortByImportance(varImp, varNames)
+
+			for i, imp := range varImp {
+				writer.Write([]string{varNames[i], strconv.FormatFloat(imp, 'f', -1, 64)})
+			}
+
+			writer.Flush()
 		}
 
 	} else {
@@ -285,7 +312,13 @@ func report(clf *forest.Classifier, varNames []string, tTime time.Duration) {
 	varImp := clf.VarImp()
 	sortByImportance(varImp, varNames)
 
-	for i, imp := range varImp {
+	// only show top 20
+	maxVars := 20
+	if maxVars > len(varImp) {
+		maxVars = len(varImp)
+	}
+
+	for i, imp := range varImp[:maxVars] {
 		fmt.Fprintf(os.Stderr, "%-15s: %-10.2f\n", varNames[i], imp)
 	}
 

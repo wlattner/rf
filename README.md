@@ -40,6 +40,8 @@ rf -d iris.csv -f iris.model
 
 `-f --final_model arg (=rf.model)` file to output fitted model
 
+`--var_importance arg` file to output variable importance estimates
+
 `--trees arg (=10)` number of trees to include in forest
 
 `--min_split arg (=2)` minimum number of samples required to split an internal node
@@ -75,7 +77,7 @@ virginica      0              3              45
 
 Overall Accuracy: 94.00%
 ```
-The confusion matrix and overall accuracy are estimated from out of bag samples for each tree in the forest.
+The confusion matrix and overall accuracy are estimated from out of bag samples for each tree in the forest. The report will show up to 20 variables in the variable importance section in decreasing order of importance. If your data have more predictors, the importance estimates for all variables can be written to a csv file using the `--var_importance` flag.
 
 ### Predict
 Predictions can be made from a previously fitted model. The data for making predictions should be in a csv file with a format similar to the data used to fit the model, however, the first column will be ignored.
