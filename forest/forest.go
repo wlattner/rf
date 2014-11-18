@@ -11,9 +11,14 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"time"
 
 	"github.com/wlattner/rf/tree"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 type ForestClassifier struct {
 	NTrees      int
@@ -165,7 +170,7 @@ func (f *ForestClassifier) Fit(X [][]float64, Y []string) {
 			for inx := range in {
 				clf := tree.NewClassifier(tree.MinSplit(f.MinSplit), tree.MinLeaf(f.MinLeaf),
 					tree.MaxDepth(f.MaxDepth), tree.Impurity(f.impurity),
-					tree.MaxFeatures(f.MaxFeatures), tree.RandState(int64(id)))
+					tree.MaxFeatures(f.MaxFeatures), tree.RandState(int64(id)*time.Now().UnixNano()))
 				clf.FitInx(X, yIDs, inx, classes)
 				out <- clf
 			}

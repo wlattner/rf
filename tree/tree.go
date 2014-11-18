@@ -224,7 +224,7 @@ func (t *Classifier) fit(X [][]float64, Y []int, inx []int, classes []string) {
 			j := nFeatures - 1
 			visited := 0
 			for j > 0 && visited < maxFeatures {
-				u := rand.Float64()
+				u := t.randState.Float64()
 				k := int(float64(j) * u)
 				features[k], features[j] = features[j], features[k]
 
