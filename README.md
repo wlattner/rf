@@ -14,8 +14,9 @@ go get github.com/wlattner/rf
 Usage
 -----
 ### Fit
-A model can be fitted from a csv file, the label should be the first column and the remaining columns should be numeric features. The file should have no header. For example, the iris data would appear as:
-
+A model can be fitted from a csv file, the label should be the first column and the remaining columns should be numeric features. The file may contain a header row. If a header row is present, the column names will be used for variable names in the variable importance report (see below). For example, the iris data would appear as:
+	
+	"Species","Sepal.Length","Sepal.Width","Petal.Length","Petal.Width"
 	"setosa",5.1,3.5,1.4,0.2
 	"setosa",4.9,3,1.4,0.2
 	"setosa",4.7,3.2,1.3,0.2
@@ -52,9 +53,34 @@ rf -d iris.csv -f iris.model
 `--workers arg (=1)` number of workers for fitting trees
 
 
+**Output**
+
+After the input data is parsed and the forest fitted, rf will write a diagnostic report to stderr.
+```bash
+Fit 10 trees using 150 examples in 0.00 seconds
+
+Variable Importance
+-------------------
+Petal.Length   : 0.55
+Petal.Width    : 0.40
+Sepal.Width    : 0.03
+Sepal.Length   : 0.02
+
+Confusion Matrix
+----------------
+               setosa         versicolor     virginica
+setosa         50             1              0
+versicolor     0              46             5
+virginica      0              3              45
+
+Overall Accuracy: 94.00%
+```
+The confusion matrix and overall accuracy are estimated from out of bag samples for each tree in the forest.
+
 ### Predict
 Predictions can be made from a previously fitted model. The data for making predictions should be in a csv file with a format similar to the data used to fit the model, however, the first column will be ignored.
-
+	
+	"Species","Sepal.Length","Sepal.Width","Petal.Length","Petal.Width"
 	"",5.1,3.5,1.4,0.2
 	"",4.9,3,1.4,0.2
 	"",4.7,3.2,1.3,0.2

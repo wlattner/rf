@@ -205,7 +205,9 @@ func parseCSV(r io.Reader) ([][]float64, []string, []string, error) {
 		// parse as X, Y
 		Y = append(Y, header[0])
 		var rowVal []float64
-		for _, val := range header[1:] {
+		for col, val := range header[1:] {
+			varNames[col] = fmt.Sprintf("X%d", col) // use X1, X2,...XN for var name
+
 			fv, err := strconv.ParseFloat(val, 64)
 			if err != nil {
 				return X, Y, varNames, err
@@ -311,5 +313,5 @@ func report(clf *forest.Classifier, varNames []string, tTime time.Duration) {
 	}
 
 	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "OOB Accuracy: %.2f%%\n", 100.0*clf.Accuracy)
+	fmt.Fprintf(os.Stderr, "Overall Accuracy: %.2f%%\n", 100.0*clf.Accuracy)
 }
