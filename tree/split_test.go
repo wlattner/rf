@@ -45,7 +45,7 @@ func TestBestSplitConstant(t *testing.T) {
 	classCtL := make([]int, 2)
 	classCtR := make([]int, 2)
 	copy(classCtR, classCount)
-	sp, gain, _ := clf.bestSplit(xi, y, inx, 0.48, classCtL, classCtR)
+	sp, gain, pos := clf.bestSplit(xi, y, inx, 0.48, classCtL, classCtR)
 	spActual := 0.0 // feature is constant, should be no split
 	if sp != spActual {
 		t.Error("expected split to be:", spActual, " got:", sp)
@@ -53,6 +53,10 @@ func TestBestSplitConstant(t *testing.T) {
 	gainActual := 0.0 // no split, no gain
 	if gain != gainActual {
 		t.Error("expected gain to be:", gainActual, "got:", gain)
+	}
+	posActual := -1
+	if pos != posActual {
+		t.Error("expected split pos to be:", posActual, "got:", pos)
 	}
 }
 

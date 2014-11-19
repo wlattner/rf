@@ -180,6 +180,16 @@ func (t *Classifier) fit(X [][]float64, Y []int, inx []int, classes []string) {
 		maxFeatures = t.nFeatures
 	}
 
+	minSplit := t.MinSplit
+	if minSplit < 0 {
+		minSplit = 2
+	}
+
+	minLeaf := t.MinLeaf
+	if minLeaf < 0 {
+		minLeaf = 1
+	}
+
 	features := make([]int, len(X[0]))
 	for i := range features {
 		features[i] = i
@@ -204,37 +214,43 @@ func (t *Classifier) fit(X [][]float64, Y []int, inx []int, classes []string) {
 			n.ClassCounts[Y[inx]]++
 		}
 
+		n.Impurity = t.impurityFn(len(w.inx), n.ClassCounts)
+
 		// TODO: this condition is getting complex
-		if (t.MinSplit > 0 && len(w.inx) < t.MinSplit) || (t.MaxDepth > 0 && w.depth == t.MaxDepth) {
+		if len(w.inx) < minSplit ||
+			len(w.inx) < 2*minLeaf ||
+			(t.MaxDepth > 0 && w.depth == t.MaxDepth) ||
+			n.Impurity <= 1e-7 {
 			// mark as leaf node, too small to split
 			n.Leaf = true
 		} else {
 
 			// compute impurity for node
-			n.Impurity = t.impurityFn(len(w.inx), n.ClassCounts)
 
 			var (
-				dBest float64
-				vBest float64
-				xBest int
-				iBest int
+				dBest float64 // best impurity improvement
+				vBest float64 // best threshold
+				xBest int     // best split var
+				iBest = -1    // left = w.inx[:iBest], right = w.inx[iBest:]
 			)
 
-			// sample from maxFeatures from features using Fisher-Yates,
+			// sample maxFeatures from features using Fisher-Yates,
 			// Algorithm P, Knuth, The Art of Computer Programming Vol. 2, p. 145
 			j := t.nFeatures - 1
 			visited := 0
-			for j > 0 && visited < maxFeatures {
-				u := t.randState.Float64()
-				k := int(float64(j) * u)
+			nDrawnConstant := 0
+			// need to visit at least one non-constant feature
+			for j > 0 && (visited < maxFeatures || visited <= nDrawnConstant) {
+				k := rand.Intn(j + 1)
+				currentFeature := features[k]
 				features[k], features[j] = features[j], features[k]
 
-				currentFeature := features[j]
 				j--
 				visited++
 
 				// do work on feature[j]
 				if len(w.constantFeatures) > 0 && w.constantFeatures[currentFeature] {
+					nDrawnConstant++
 					continue
 				}
 
@@ -250,6 +266,7 @@ func (t *Classifier) fit(X [][]float64, Y []int, inx []int, classes []string) {
 				//TODO: find a better way to share the constant feature list with
 				// child nodes
 				if xt[len(xt)-1] <= xt[0]+1e-7 {
+					nDrawnConstant++
 					c := make([]bool, t.nFeatures)
 					copy(c, w.constantFeatures)
 					c[currentFeature] = true
@@ -272,7 +289,7 @@ func (t *Classifier) fit(X [][]float64, Y []int, inx []int, classes []string) {
 				}
 			}
 
-			if dBest > 1e-6 {
+			if iBest > 0 {
 				// partition w.inx into left/right
 				i := 0
 				j := len(w.inx)
@@ -438,7 +455,7 @@ func (t *Classifier) bestSplit(xi []float64, y []int, inx []int, dInit float64,
 
 	var (
 		dBest, vBest, v, d float64
-		pos                int
+		pos                = -1
 	)
 
 	n := len(xi)
