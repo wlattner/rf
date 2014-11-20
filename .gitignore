@@ -8,3 +8,5 @@ forest/forest.test
 rf.linux
 README.html
 iris_header.csv
+*.model
+*.gob
