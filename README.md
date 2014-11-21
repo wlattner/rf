@@ -1,7 +1,7 @@
 rf
 ==
 
-This is a Go implementation of a random forest classifier, as described in Louppe, G. (2014) ["Understanding Random Forests: From Theory to Practice"](http://arxiv.org/abs/1407.7502) (PhD thesis). Both the random forest and the decision tree are usable as standalone Go packages. The commandline app can fit a model from a csv file and make predictions from a previously fitted model and a csv file with new examples. The csv parser is rather limited, only numeric values are accepted.
+This is a Go implementation of the random forest algorithm for classification and regression, as described in Louppe, G. (2014) ["Understanding Random Forests: From Theory to Practice"](http://arxiv.org/abs/1407.7502) (PhD thesis). Both the random forest and the decision tree are usable as standalone Go packages. The cli can fit a model from a csv file and make predictions from a previously fitted model. The csv parser is rather limited, only numeric values are accepted.
 
 [![GoDoc](https://godoc.org/github.com/wlattner/rf?status.svg)](http://godoc.org/github.com/wlattner/rf)
 
@@ -14,7 +14,7 @@ go get github.com/wlattner/rf
 Usage
 -----
 ### Fit
-A model can be fitted from a csv file, the label should be the first column and the remaining columns should be numeric features. The file may contain a header row. If a header row is present, the column names will be used for variable names in the variable importance report (see below). For example, the iris data would appear as:
+A model can be fitted from a csv file, the label or target value should be the first column and the remaining columns should be numeric features. The file may contain a header row. If a header row is present, the column names will be used for variable names in the variable importance report (see below). For example, the iris data would appear as:
 	
 	"Species","Sepal.Length","Sepal.Width","Petal.Length","Petal.Width"
 	"setosa",5.1,3.5,1.4,0.2
@@ -54,6 +54,16 @@ rf -d iris.csv -f iris.model
 
 `--workers arg (=1)` number of workers for fitting trees
 
+Regression is also supported, the csv parser will detect if the first column is numeric or categorical. If the class labels look like numbers:
+
+	"Species",Sepal.Length","Sepal.Width","Petal.Length","Petal.Width"
+	"1",5.1,3.5,1.4,0.2
+	"1",4.9,3,1.4,0.2
+	...
+	"2",5.9,3,5.1,1.8
+
+The parser will get confused and fit a regression model.
+
 
 **Output**
 
@@ -78,6 +88,32 @@ virginica      0              3              45
 Overall Accuracy: 94.00%
 ```
 The confusion matrix and overall accuracy are estimated from out of bag samples for each tree in the forest. The report will show up to 20 variables in the variable importance section in decreasing order of importance. If your data have more predictors, the importance estimates for all variables can be written to a csv file using the `--var_importance` flag.
+
+For a regression model:
+```bash
+Fit 10 trees using 506 examples in 0.01 seconds
+
+Variable Importance
+-------------------
+rm             : 0.38
+lstat          : 0.30
+nox            : 0.12
+crim           : 0.05
+dis            : 0.03
+ptratio        : 0.03
+tax            : 0.02
+age            : 0.02
+black          : 0.02
+rad            : 0.01
+indus          : 0.01
+zn             : 0.01
+chas           : 0.00
+
+
+Mean Squared Error: 15.677
+R-Squared: 81.487%
+```
+The mean squared error is computed from out of bag samples for each tree in the forest. The variable importance is reported in the same manner as classification.
 
 ### Predict
 Predictions can be made from a previously fitted model. The data for making predictions should be in a csv file with a format similar to the data used to fit the model, however, the first column will be ignored.

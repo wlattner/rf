@@ -85,3 +85,15 @@ func TestBestSplitSomeConstant(t *testing.T) {
 		t.Error("expected gain to be:", gainActual, "got:", gain)
 	}
 }
+
+func TestBestSplitReg(t *testing.T) {
+	reg := NewRegressor()
+	xi := []float64{9.91655, 13.6781}
+	Y := []float64{6.29, 8.40}
+	inx := []int{0, 1}
+
+	sp, gain, pos := reg.bestSplit(xi, Y, inx, 1.113)
+	if pos == -1 {
+		t.Error("expected split to find something", sp, gain, pos)
+	}
+}
