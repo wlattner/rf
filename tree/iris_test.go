@@ -1,7 +1,6 @@
 package tree
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 	"strings"
@@ -43,34 +42,6 @@ func TestIrisVariableImportance(t *testing.T) {
 		t.Error("expected variable importance to sum to 1, got:", sum)
 	}
 
-}
-
-func TestEncodeDecode(t *testing.T) {
-	clf := NewClassifier(MinSplit(2), MinLeaf(1))
-
-	clf.Fit(X, Y)
-
-	var buf bytes.Buffer
-	clf.Save(&buf)
-
-	clf2 := NewClassifier()
-	clf2.Load(&buf)
-
-	pred := clf2.Predict(X)
-
-	correctFrac := 0.0
-	contrib := 1.0 / float64(len(pred))
-	for i := range Y {
-		if Y[i] == clf.Classes[pred[i]] {
-			correctFrac += contrib
-		}
-	}
-
-	if math.Abs(correctFrac-1.0) > 1e-6 {
-		t.Errorf("expected accuracy on iris data to be at 1.0, got: %f", correctFrac)
-		// dump the tree
-		printTree(clf.Root, 0)
-	}
 }
 
 func BenchmarkIrisFit(b *testing.B) {

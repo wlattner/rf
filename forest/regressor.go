@@ -1,8 +1,6 @@
 package forest
 
 import (
-	"encoding/gob"
-	"io"
 	"math"
 	"time"
 
@@ -149,18 +147,6 @@ func (f *Regressor) VarImp() []float64 {
 	}
 
 	return imp
-}
-
-// Save writes a model to an io.Writer using encoding/gob
-func (f *Regressor) Save(w io.Writer) error {
-	e := gob.NewEncoder(w)
-	return e.Encode(f)
-}
-
-// Load reads a model previously saved with Save from an io.Reader
-func (f *Regressor) Load(r io.Reader) error {
-	d := gob.NewDecoder(r)
-	return d.Decode(f)
 }
 
 type fitRegTree struct {

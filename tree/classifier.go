@@ -1,8 +1,6 @@
 package tree
 
 import (
-	"encoding/gob"
-	"io"
 	"math"
 	"math/rand"
 	"time"
@@ -365,18 +363,6 @@ func (t *Classifier) VarImp() []float64 {
 	}
 
 	return imp
-}
-
-// Save serializes the Classifier using encoding/gob to an io.Writer.
-func (t *Classifier) Save(w io.Writer) error {
-	e := gob.NewEncoder(w)
-	return e.Encode(t)
-}
-
-// Load deserializes the Classifier using encoding/gob from an io.Reader.
-func (t *Classifier) Load(r io.Reader) error {
-	d := gob.NewDecoder(r)
-	return d.Decode(t)
 }
 
 // this function takes a lot of args

@@ -87,6 +87,7 @@ func main() {
 		fatal("error opening data file", err.Error())
 	}
 	defer f.Close()
+
 	d, err := parseCSV(f)
 	if err != nil {
 		fatal("error parsing input data", err.Error())
@@ -109,6 +110,7 @@ func main() {
 		if err != nil {
 			fatal("error creating", *predictFile, err.Error())
 		}
+		defer o.Close()
 
 		err = writePred(o, pred)
 		if err != nil {
@@ -133,6 +135,7 @@ func main() {
 			fatal("error saving model", err.Error())
 		}
 		defer o.Close()
+
 		err = m.Save(o)
 		if err != nil {
 			fatal("error saving model", err.Error())

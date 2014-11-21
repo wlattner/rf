@@ -1,7 +1,6 @@
 package forest
 
 import (
-	"bytes"
 	"math"
 	"testing"
 )
@@ -55,32 +54,6 @@ func TestIrisOOBError(t *testing.T) {
 		if clf.ConfusionMatrix[i][i] < 40 || clf.ConfusionMatrix[i][i] > 50 {
 			t.Errorf("expected confusion matrix entry to be at least 45 and less than 50, got: %d", clf.ConfusionMatrix[i][i])
 		}
-	}
-}
-
-func TestEncodeDecode(t *testing.T) {
-	clf := NewClassifier(NumTrees(10))
-
-	clf.Fit(X, Y)
-
-	var buf bytes.Buffer
-	clf.Save(&buf)
-
-	clf2 := NewClassifier()
-	clf2.Load(&buf)
-
-	pred := clf2.Predict(X)
-
-	correctFrac := 0.0
-	contrib := 1.0 / float64(len(pred))
-	for i := range Y {
-		if Y[i] == clf.Classes[pred[i]] {
-			correctFrac += contrib
-		}
-	}
-
-	if correctFrac < 0.98 {
-		t.Errorf("expected accuracy on iris data to be at least 0.98, got: %f", correctFrac)
 	}
 }
 
