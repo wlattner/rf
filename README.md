@@ -54,6 +54,8 @@ rf -d iris.csv -f iris.model
 
 `--workers arg (=1)` number of workers for fitting trees
 
+`-c, --classification` force parser to use integer/numeric labels for classification
+
 Regression is also supported, the csv parser will detect if the first column is numeric or categorical. If the class labels look like numbers:
 
 	"Species",Sepal.Length","Sepal.Width","Petal.Length","Petal.Width"
@@ -62,7 +64,7 @@ Regression is also supported, the csv parser will detect if the first column is 
 	...
 	"2",5.9,3,5.1,1.8
 
-The parser will get confused and fit a regression model.
+The parser will get confused and fit a regression model, if this happens, try running with the `--classification` flag.
 
 
 **Output**
