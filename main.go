@@ -26,6 +26,8 @@ var (
 	minLeaf     = flag.Int([]string{"-min_leaf"}, 1, "minimum number of samples in newly created leaves")
 	maxFeatures = flag.Int([]string{"-max_features"}, -1, "number of features to consider when looking for the best split, -1 will default to √(# features)")
 	impurity    = flag.String([]string{"-impurity"}, "gini", "impurity measure for evaluating splits")
+	// force classification
+	forceClf = flag.Bool([]string{"c", "-classification"}, false, "force parser to use integer targets/labels for classification")
 	// runtime params
 	nWorkers   = flag.Int([]string{"-workers"}, 1, "number of workers for fitting trees")
 	runProfile = flag.Bool([]string{"-profile"}, false, "cpu profile")
@@ -88,7 +90,7 @@ func main() {
 	}
 	defer f.Close()
 
-	d, err := parseCSV(f)
+	d, err := parseCSV(f, *forceClf)
 	if err != nil {
 		fatal("error parsing input data", err.Error())
 	}

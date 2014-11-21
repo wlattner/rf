@@ -8,7 +8,7 @@ import (
 func TestDetectBostonRegression(t *testing.T) {
 	r := strings.NewReader(bostonCSV)
 
-	p, err := parseCSV(r)
+	p, err := parseCSV(r, false)
 	if err != nil {
 		t.Error("unexpected error parsing boston data:", err)
 		return
@@ -45,7 +45,7 @@ func TestDetectBostonRegression(t *testing.T) {
 func TestDetectIrisClassification(t *testing.T) {
 	r := strings.NewReader(irisCSV)
 
-	p, err := parseCSV(r)
+	p, err := parseCSV(r, false)
 	if err != nil {
 		t.Error("unexpected error parsing iris data:", err)
 		return

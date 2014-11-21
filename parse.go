@@ -18,12 +18,13 @@ type parsedInput struct {
 
 // parse csv file, detect if first row is header/has var names,
 // returns X, Y, varNames, error
-func parseCSV(r io.Reader) (*parsedInput, error) {
+func parseCSV(r io.Reader, forceClf bool) (*parsedInput, error) {
 	reader := csv.NewReader(r)
 
 	// isRegression=true, parse as regression until we hit
-	// errors parsing floats, then set flag
-	p := &parsedInput{isRegression: true}
+	// errors parsing floats, then set flag; set to false
+	// when forceClf
+	p := &parsedInput{isRegression: !forceClf}
 
 	// grab first fow
 	row, err := reader.Read()
