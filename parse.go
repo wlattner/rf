@@ -58,7 +58,10 @@ func parseCSV(r io.Reader) (*parsedInput, error) {
 			return p, err
 		}
 
-		p.ParseRow(row)
+		err = p.ParseRow(row)
+		if err != nil {
+			return p, err
+		}
 	}
 
 	// drop the y vals we aren't using
