@@ -46,6 +46,10 @@ func TestBostonOOBMSE(t *testing.T) {
 	if reg.MSE > 18 { // rmse of 4.24
 		t.Errorf("expected oob mse to be less than 18, got: %f", reg.MSE)
 	}
+
+	if reg.RSquared < 0.7 {
+		t.Errorf("expected oob rsquared to be greater than 0.7, got: %f", reg.RSquared)
+	}
 }
 
 var bostonFeatures = []string{"CRIM", "ZN", "INDUS", "CHAS", "NOX", "RM", "AGE", "DIS", "RAD", "TAX", "PTRATIO", "B", "LSTAT"}

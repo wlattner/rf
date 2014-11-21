@@ -91,26 +91,27 @@ The confusion matrix and overall accuracy are estimated from out of bag samples 
 
 For a regression model:
 ```bash
-Fit 10 trees using 506 examples in 0.02 seconds
+Fit 10 trees using 506 examples in 0.01 seconds
 
 Variable Importance
 -------------------
+rm             : 0.38
 lstat          : 0.30
-rm             : 0.24
-nox            : 0.10
-indus          : 0.07
-dis            : 0.05
-tax            : 0.05
-crim           : 0.04
+nox            : 0.12
+crim           : 0.05
+dis            : 0.03
 ptratio        : 0.03
-rad            : 0.03
+tax            : 0.02
 age            : 0.02
 black          : 0.02
-chas           : 0.02
-zn             : 0.02
+rad            : 0.01
+indus          : 0.01
+zn             : 0.01
+chas           : 0.00
 
 
-Mean Squared Error: 16.313
+Mean Squared Error: 15.677
+R-Squared: 81.487%
 ```
 The mean squared error is computed from out of bag samples for each tree in the forest. The variable importance is reported in the same manner as classification.
 

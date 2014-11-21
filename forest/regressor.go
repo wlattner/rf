@@ -19,6 +19,7 @@ type Regressor struct {
 	nWorkers    int
 	computeOOB  bool
 	MSE         float64
+	RSquared    float64
 	NSample     int
 	nFeatures   int
 }
@@ -116,7 +117,7 @@ func (f *Regressor) Fit(X [][]float64, Y []float64) {
 	}
 
 	if f.computeOOB {
-		f.MSE = oob.compute(Y)
+		f.MSE, f.RSquared = oob.compute(Y)
 	}
 }
 
@@ -195,8 +196,15 @@ func (o *oobRegCtr) update(X [][]float64, inBag []bool, t *tree.Regressor) {
 	}
 }
 
-func (o *oobRegCtr) compute(Y []float64) float64 {
-	ssq := 0.0
+// compute returns mean squared error and rsquared
+func (o *oobRegCtr) compute(Y []float64) (float64, float64) {
+	rss := 0.0 // residual sum square
+
+	// tss of Y
+	n := 0
+	mean := 0.0
+	tss := 0.0
+
 	for i := range Y {
 		// skip examples that were in all trees
 		if o.ct[i] < 1 {
@@ -204,8 +212,21 @@ func (o *oobRegCtr) compute(Y []float64) float64 {
 		}
 		predVal := o.sum[i] / float64(o.ct[i])
 		d := Y[i] - predVal
-		ssq += d * d
+		rss += d * d
+
+		// update var
+		n++
+		d = Y[i] - mean
+		mean += d / float64(n)
+		tss += d * (Y[i] - mean)
 	}
 
-	return ssq / float64(len(Y))
+	if n < 1 {
+		tss = 0.0
+	}
+
+	rSquared := 1.0 - rss/tss
+	mse := rss / float64(n)
+
+	return mse, rSquared
 }

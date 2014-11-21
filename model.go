@@ -120,6 +120,7 @@ func (m *Model) reportClf(w io.Writer) {
 func (m *Model) reportReg(w io.Writer) {
 	fmt.Fprintf(w, "\n")
 	fmt.Fprintf(w, "Mean Squared Error: %.3f\n", m.Reg.MSE)
+	fmt.Fprintf(w, "R-Squared: %.3f%%\n", 100*m.Reg.RSquared)
 }
 
 func (m *Model) VarImp() []float64 {
