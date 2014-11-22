@@ -15,7 +15,6 @@ type Classifier struct {
 	MaxFeatures     int
 	Classes         []string
 	Trees           []*tree.Classifier
-	impurity        tree.ImpurityMeasure
 	nWorkers        int
 	computeOOB      bool
 	ConfusionMatrix [][]int
@@ -25,14 +24,13 @@ type Classifier struct {
 }
 
 // methods for the forestConfiger interface
-func (c *Classifier) setMinSplit(n int)                  { c.MinSplit = n }
-func (c *Classifier) setMinLeaf(n int)                   { c.MinLeaf = n }
-func (c *Classifier) setMaxDepth(n int)                  { c.MaxDepth = n }
-func (c *Classifier) setImpurity(f tree.ImpurityMeasure) { c.impurity = f }
-func (c *Classifier) setMaxFeatures(n int)               { c.MaxFeatures = n }
-func (c *Classifier) setNumTrees(n int)                  { c.NTrees = n }
-func (c *Classifier) setNumWorkers(n int)                { c.nWorkers = n }
-func (c *Classifier) setComputeOOB()                     { c.computeOOB = true }
+func (c *Classifier) setMinSplit(n int)    { c.MinSplit = n }
+func (c *Classifier) setMinLeaf(n int)     { c.MinLeaf = n }
+func (c *Classifier) setMaxDepth(n int)    { c.MaxDepth = n }
+func (c *Classifier) setMaxFeatures(n int) { c.MaxFeatures = n }
+func (c *Classifier) setNumTrees(n int)    { c.NTrees = n }
+func (c *Classifier) setNumWorkers(n int)  { c.nWorkers = n }
+func (c *Classifier) setComputeOOB()       { c.computeOOB = true }
 
 // NewClassifier returns a configured/initialized random forest classifier.
 // If no options are passed, the returned Classifier will be equivalent to
@@ -47,7 +45,6 @@ func NewClassifier(options ...func(forestConfiger)) *Classifier {
 		MinSplit:    2,
 		MinLeaf:     1,
 		MaxDepth:    -1,
-		impurity:    Gini,
 	}
 
 	for _, opt := range options {
@@ -102,7 +99,7 @@ func (f *Classifier) Fit(X [][]float64, Y []string) {
 		go func(id int) {
 			for w := range in {
 				clf := tree.NewClassifier(tree.MinSplit(f.MinSplit), tree.MinLeaf(f.MinLeaf),
-					tree.MaxDepth(f.MaxDepth), tree.Impurity(f.impurity), tree.MaxFeatures(f.MaxFeatures),
+					tree.MaxDepth(f.MaxDepth), tree.MaxFeatures(f.MaxFeatures),
 					tree.RandState(int64(id)*time.Now().UnixNano()))
 				clf.FitInx(X, yIDs, w.inx, classes)
 
@@ -231,7 +228,7 @@ func (o *oobCtr) update(X [][]float64, inBag []bool, t *tree.Classifier) {
 		}
 	}
 
-	pred := t.PredictID(X, inx)
+	pred := t.PredictInx(X, inx)
 
 	for i, sampleInx := range inx {
 		o.classVotes[sampleInx][pred[i]]++

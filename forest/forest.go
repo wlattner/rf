@@ -9,8 +9,6 @@ package forest
 import (
 	"math/rand"
 	"time"
-
-	"github.com/wlattner/rf/tree"
 )
 
 func init() {
@@ -21,17 +19,11 @@ type forestConfiger interface {
 	setMinSplit(n int)
 	setMinLeaf(n int)
 	setMaxDepth(n int)
-	setImpurity(f tree.ImpurityMeasure)
 	setMaxFeatures(n int)
 	setNumTrees(n int)
 	setNumWorkers(n int)
 	setComputeOOB()
 }
-
-var (
-	Gini    = tree.Gini
-	Entropy = tree.Entropy
-)
 
 // MinSplit limits the size for a node to be split vs marked as a leaf
 func MinSplit(n int) func(forestConfiger) {
@@ -53,15 +45,6 @@ func MinLeaf(n int) func(forestConfiger) {
 func MaxDepth(n int) func(forestConfiger) {
 	return func(c forestConfiger) {
 		c.setMaxDepth(n)
-	}
-}
-
-// Impurity sets the impurity measure used to evaluate each candidate split.
-// Currently Gini and Entropy are the only implemented options. Impurity will
-// be ignored for regression.
-func Impurity(f tree.ImpurityMeasure) func(forestConfiger) {
-	return func(c forestConfiger) {
-		c.setImpurity(f)
 	}
 }
 

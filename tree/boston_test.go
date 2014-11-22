@@ -24,17 +24,50 @@ func TestBostonFitPredict(t *testing.T) {
 	}
 }
 
-func printRegTree(n *RegNode, indent int) {
+// func TestBostonFitPredict2(t *testing.T) {
+// 	reg := NewRegressor()
+// 	reg.fit2(bostonX, bostonY)
+
+// 	pred := reg.Predict(bostonX)
+
+// 	sqErrSum := 0.0
+// 	for i := range bostonY {
+// 		d := pred[i] - bostonY[i]
+// 		sqErrSum += d * d
+// 	}
+
+// 	sqErr := sqErrSum / float64(len(bostonY))
+// 	if sqErr > 0.0 {
+// 		t.Error("expected error to be 0, got:", sqErr)
+// 		printRegTree(reg.Root, 0)
+// 	}
+// }
+
+func BenchmarkBostonFit(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		reg := NewRegressor()
+		reg.Fit(bostonX, bostonY)
+	}
+}
+
+// func BenchmarkBostonFit2(b *testing.B) {
+// 	for i := 0; i < b.N; i++ {
+// 		reg := NewRegressor()
+// 		reg.fit2(bostonX, bostonY)
+// 	}
+// }
+
+func printRegTree(n *Node, indent int) {
 	if n != nil {
 		if n.Samples > 0 {
-			fmt.Println(strings.Repeat("\t", indent), n)
+			fmt.Println(strings.Repeat("\t", indent), n.RegString())
 		}
 		printRegTree(n.Left, indent+1)
 		printRegTree(n.Right, indent+1)
 	}
 }
 
-func (n *RegNode) String() string {
+func (n *Node) RegString() string {
 	if n.Left == nil && n.Right == nil {
 		return fmt.Sprintf("impurity: %f, value: %v, n: %d *", n.Impurity, n.Value, n.Samples)
 	}

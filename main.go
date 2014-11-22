@@ -2,14 +2,12 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"runtime"
 
 	"github.com/davecheney/profile"
-	"github.com/wlattner/rf/tree"
 
 	flag "github.com/docker/docker/pkg/mflag"
 )
@@ -24,8 +22,7 @@ var (
 	nTree       = flag.Int([]string{"-trees"}, 10, "number of trees")
 	minSplit    = flag.Int([]string{"-min_split"}, 2, "minimum number of samples required to split an internal node")
 	minLeaf     = flag.Int([]string{"-min_leaf"}, 1, "minimum number of samples in newly created leaves")
-	maxFeatures = flag.Int([]string{"-max_features"}, -1, "number of features to consider when looking for the best split, -1 will default to √(# features)")
-	impurity    = flag.String([]string{"-impurity"}, "gini", "impurity measure for evaluating splits")
+	maxFeatures = flag.Int([]string{"-max_features"}, -1, "number of features to consider when looking for the best split, -1 will default to √(# features) or # features / 3 for regression")
 	// force classification
 	forceClf = flag.Bool([]string{"c", "-classification"}, false, "force parser to use integer targets/labels for classification")
 	// runtime params
@@ -38,14 +35,7 @@ type modelOptions struct {
 	minSplit    int
 	minLeaf     int
 	maxFeatures int
-	impurity    tree.ImpurityMeasure
 	nWorkers    int
-}
-
-// lookup table for impurity measure
-var impurityCode = map[string]tree.ImpurityMeasure{
-	"gini":    tree.Gini,
-	"entropy": tree.Entropy,
 }
 
 func parseModelOpts() (modelOptions, error) {
@@ -57,12 +47,6 @@ func parseModelOpts() (modelOptions, error) {
 		nWorkers:    *nWorkers,
 	}
 
-	imp, ok := impurityCode[*impurity]
-	if !ok {
-		return o, errors.New("invalid impurity option, choices are gini or entropy")
-	}
-
-	o.impurity = imp
 	return o, nil
 }
 

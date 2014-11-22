@@ -8,7 +8,7 @@ import (
 )
 
 func TestIrisFitPredict(t *testing.T) {
-	clf := NewClassifier(MinSplit(2), MinLeaf(1), Impurity(Gini))
+	clf := NewClassifier(MinSplit(2), MinLeaf(1))
 
 	clf.Fit(X, Y)
 
@@ -29,8 +29,29 @@ func TestIrisFitPredict(t *testing.T) {
 	}
 }
 
+// func TestIrisFitPredict2(t *testing.T) {
+// 	clf := NewClassifier()
+// 	clf.fit2(X, Y)
+
+// 	pred := clf.Predict(X)
+
+// 	correctFrac := 0.0
+// 	contrib := 1.0 / float64(len(pred))
+// 	for i := range Y {
+// 		if Y[i] == clf.Classes[pred[i]] {
+// 			correctFrac += contrib
+// 		}
+// 	}
+
+// 	if math.Abs(correctFrac-1.0) > 1e-6 {
+// 		t.Errorf("expected accuracy on iris data to be at 1.0, got: %f", correctFrac)
+// 		// dump the tree
+// 		printTree(clf.Root, 0)
+// 	}
+// }
+
 func TestIrisVariableImportance(t *testing.T) {
-	clf := NewClassifier(MinSplit(2), MinLeaf(1), Impurity(Gini))
+	clf := NewClassifier(MinSplit(2), MinLeaf(1))
 	clf.Fit(X, Y)
 
 	sum := 0.0
@@ -52,6 +73,13 @@ func BenchmarkIrisFit(b *testing.B) {
 	}
 }
 
+// func BenchmarkIrisFit2(b *testing.B) {
+// 	for i := 0; i < b.N; i++ {
+// 		clf := NewClassifier()
+// 		clf.fit2(X, Y)
+// 	}
+// }
+
 func BenchmarkIrisPredict(b *testing.B) {
 	clf := NewClassifier()
 	clf.Fit(X, Y)
@@ -65,14 +93,14 @@ func BenchmarkIrisPredict(b *testing.B) {
 func printTree(n *Node, indent int) {
 	if n != nil {
 		if n.Samples > 0 {
-			fmt.Println(strings.Repeat("\t", indent), n)
+			fmt.Println(strings.Repeat("\t", indent), n.ClfString())
 		}
 		printTree(n.Left, indent+1)
 		printTree(n.Right, indent+1)
 	}
 }
 
-func (n *Node) String() string {
+func (n *Node) ClfString() string {
 	if n.Left == nil && n.Right == nil {
 		return fmt.Sprintf("impurity: %f, classes: %v, n: %d *", n.Impurity, n.ClassCounts, n.Samples)
 	}

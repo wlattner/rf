@@ -36,7 +36,7 @@ func (m *Model) Fit(d *parsedInput, opt modelOptions) {
 		m.IsRegression = true
 	} else {
 		clf := forest.NewClassifier(forest.NumTrees(opt.nTree), forest.MinSplit(opt.minSplit),
-			forest.MinLeaf(opt.minLeaf), forest.MaxFeatures(opt.maxFeatures), forest.Impurity(opt.impurity),
+			forest.MinLeaf(opt.minLeaf), forest.MaxFeatures(opt.maxFeatures),
 			forest.NumWorkers(opt.nWorkers), forest.ComputeOOB)
 
 		clf.Fit(d.X, d.YClf)

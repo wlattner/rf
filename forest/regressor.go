@@ -1,7 +1,6 @@
 package forest
 
 import (
-	"math"
 	"time"
 
 	"github.com/wlattner/rf/tree"
@@ -23,14 +22,13 @@ type Regressor struct {
 }
 
 // methods for the forestConfiger interface
-func (c *Regressor) setMinSplit(n int)                  { c.MinSplit = n }
-func (c *Regressor) setMinLeaf(n int)                   { c.MinLeaf = n }
-func (c *Regressor) setMaxDepth(n int)                  { c.MaxDepth = n }
-func (c *Regressor) setImpurity(f tree.ImpurityMeasure) {}
-func (c *Regressor) setMaxFeatures(n int)               { c.MaxFeatures = n }
-func (c *Regressor) setNumTrees(n int)                  { c.NTrees = n }
-func (c *Regressor) setNumWorkers(n int)                { c.nWorkers = n }
-func (c *Regressor) setComputeOOB()                     { c.computeOOB = true }
+func (c *Regressor) setMinSplit(n int)    { c.MinSplit = n }
+func (c *Regressor) setMinLeaf(n int)     { c.MinLeaf = n }
+func (c *Regressor) setMaxDepth(n int)    { c.MaxDepth = n }
+func (c *Regressor) setMaxFeatures(n int) { c.MaxFeatures = n }
+func (c *Regressor) setNumTrees(n int)    { c.NTrees = n }
+func (c *Regressor) setNumWorkers(n int)  { c.nWorkers = n }
+func (c *Regressor) setComputeOOB()       { c.computeOOB = true }
 
 // NewRegressor returns a configured/initilized random forest regressor.
 // If no options are passed, the returned Regressor will be equivalent to
@@ -64,7 +62,7 @@ func (f *Regressor) Fit(X [][]float64, Y []float64) {
 	f.Trees = make([]*tree.Regressor, f.NTrees)
 
 	if f.MaxFeatures < 0 {
-		f.MaxFeatures = int(math.Sqrt(float64(f.nFeatures)))
+		f.MaxFeatures = f.nFeatures / 3
 	}
 
 	var oob *oobRegCtr

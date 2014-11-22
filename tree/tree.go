@@ -6,67 +6,84 @@
 // thesis. The Fit follows Algorithm 3.2, the bestSplit method follows Algorithm 3.4.
 package tree
 
-type ImpurityMeasure int
+import "math/rand"
 
-const (
-	Gini ImpurityMeasure = iota
-	Entropy
-)
+type Tree struct {
+	Root        *Node
+	MinSplit    int      // min node size for split
+	MinLeaf     int      // min leaf size for split
+	MaxDepth    int      // max depth
+	MaxFeatures int      // number of features to consider for splitting
+	Classes     []string // will be blank for regression
+	randState   *rand.Rand
+	nFeatures   int
+	v           valuer
+}
 
-// interface for configuration so we can use the same args/functions to set
-// regression trees
-type treeConfiger interface {
-	setMinSplit(n int)
-	setMinLeaf(n int)
-	setMaxDepth(n int)
-	setImpurity(f ImpurityMeasure)
-	setMaxFeatures(n int)
-	setRandState(n int64)
+type Node struct {
+	Left, Right *Node
+	SplitVar    int
+	SplitVal    float64
+	Impurity    float64
+	Leaf        bool
+	Samples     int
+	ClassCounts []int   // will be nil for regression
+	Value       float64 // fill be 0 for classification
+}
+
+func (n *Node) setValue(v interface{}) {
+	switch val := v.(type) {
+	case float64:
+		n.Value = val
+	case []int:
+		n.ClassCounts = val
+	}
 }
 
 // MinSplit limits the size for a node to be split vs marked as a leaf
-func MinSplit(n int) func(treeConfiger) {
-	return func(c treeConfiger) {
-		c.setMinSplit(n)
+func MinSplit(n int) func(*Tree) {
+	return func(t *Tree) {
+		t.MinSplit = n
 	}
 }
 
 // MinLeaf limits the size of a child/leaf node for a split
 // threshold to be considered
-func MinLeaf(n int) func(treeConfiger) {
-	return func(c treeConfiger) {
-		c.setMinLeaf(n)
+func MinLeaf(n int) func(*Tree) {
+	return func(t *Tree) {
+		t.MinLeaf = n
 	}
 }
 
 // MaxDepth limits the depth of the fitted tree. Specifying -1 for n will
 // grow a full tree, subject to MinLeaf and MinSplit constraints.
-func MaxDepth(n int) func(treeConfiger) {
-	return func(c treeConfiger) {
-		c.setMaxDepth(n)
-	}
-}
-
-// Impurity sets the impurity measure used to evaluate each candidate split.
-// Currently Gini and Entropy are the only implemented options. The impurity
-// setting will be ignored for regression.
-func Impurity(f ImpurityMeasure) func(treeConfiger) {
-	return func(c treeConfiger) {
-		c.setImpurity(f)
+func MaxDepth(n int) func(*Tree) {
+	return func(t *Tree) {
+		t.MaxDepth = n
 	}
 }
 
 // MaxFeatures limits the number of features considered for splitting at each
 // step. If not provided or -1 then all features are considered.
-func MaxFeatures(n int) func(treeConfiger) {
-	return func(c treeConfiger) {
-		c.setMaxFeatures(n)
+func MaxFeatures(n int) func(*Tree) {
+	return func(t *Tree) {
+		t.MaxFeatures = n
 	}
 }
 
 // RandState sets the seed for the random number generator
-func RandState(n int64) func(treeConfiger) {
-	return func(c treeConfiger) {
-		c.setRandState(n)
+func RandState(n int64) func(*Tree) {
+	return func(t *Tree) {
+		t.randState = rand.New(rand.NewSource(n))
 	}
+}
+
+type nodeStack []*Node
+
+func (s nodeStack) Empty() bool   { return len(s) == 0 }
+func (s *nodeStack) Push(n *Node) { *s = append(*s, n) }
+func (s *nodeStack) Pop() *Node {
+	d := (*s)[len(*s)-1]
+	*s = (*s)[:len(*s)-1]
+	return d
 }
