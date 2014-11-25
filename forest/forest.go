@@ -26,6 +26,7 @@ type forestConfiger interface {
 	setNumTrees(n int)
 	setNumWorkers(n int)
 	setComputeOOB()
+	setMaxTrees(n int)
 }
 
 var (
@@ -92,6 +93,12 @@ func NumWorkers(n int) func(forestConfiger) {
 // and confusion matrix from out of bag samples for each tree.
 func ComputeOOB(c forestConfiger) {
 	c.setComputeOOB()
+}
+
+func MaxTrees(n int) func(forestConfiger) {
+	return func(c forestConfiger) {
+		c.setMaxTrees(n)
+	}
 }
 
 func bootstrapInx(n int) ([]int, []bool) {

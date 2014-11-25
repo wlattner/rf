@@ -20,6 +20,7 @@ type Regressor struct {
 	RSquared    float64
 	NSample     int
 	nFeatures   int
+	maxTrees    int
 }
 
 // methods for the forestConfiger interface
@@ -31,6 +32,7 @@ func (c *Regressor) setMaxFeatures(n int)               { c.MaxFeatures = n }
 func (c *Regressor) setNumTrees(n int)                  { c.NTrees = n }
 func (c *Regressor) setNumWorkers(n int)                { c.nWorkers = n }
 func (c *Regressor) setComputeOOB()                     { c.computeOOB = true }
+func (c *Regressor) setMaxTrees(n int)                  { c.maxTrees = n }
 
 // NewRegressor returns a configured/initilized random forest regressor.
 // If no options are passed, the returned Regressor will be equivalent to
@@ -45,6 +47,7 @@ func NewRegressor(options ...func(forestConfiger)) *Regressor {
 		MinSplit:    2,
 		MinLeaf:     1,
 		MaxDepth:    -1,
+		maxTrees:    -1,
 	}
 
 	for _, opt := range options {
@@ -61,19 +64,20 @@ func (f *Regressor) Fit(X [][]float64, Y []float64) {
 
 	f.nFeatures = len(X[0])
 
-	f.Trees = make([]*tree.Regressor, f.NTrees)
+	if f.maxTrees > 0 && f.NTrees > f.maxTrees {
+		f.maxTrees = f.NTrees
+	}
 
 	if f.MaxFeatures < 0 {
 		f.MaxFeatures = int(math.Sqrt(float64(f.nFeatures)))
 	}
 
 	var oob *oobRegCtr
-	if f.computeOOB {
-		oob = newOOBRegCtr(len(Y))
-	}
+	oob = newOOBRegCtr(len(Y))
 
 	in := make(chan *fitRegTree)
 	out := make(chan *fitRegTree)
+	quit := make(chan struct{})
 
 	nWorkers := f.nWorkers
 	if nWorkers < 1 {
@@ -91,32 +95,43 @@ func (f *Regressor) Fit(X [][]float64, Y []float64) {
 
 				w.t = reg
 
-				if f.computeOOB {
-					oob.update(X, w.inBag, w.t)
-				}
+				oob.update(X, w.inBag, w.t)
 
 				out <- w
 			}
 		}(i)
 	}
 
-	// fill the queue
 	go func() {
-		for _ = range f.Trees {
-			inx, inBag := bootstrapInx(len(X))
-			in <- &fitRegTree{inx: inx, inBag: inBag}
+		for i := 0; i < f.maxTrees; i++ {
+			select {
+			case <-quit:
+				break
+			default:
+				inx, inBag := bootstrapInx(len(X))
+				in <- &fitRegTree{inx: inx, inBag: inBag}
+			}
 		}
 		close(in)
 	}()
 
-	for i := range f.Trees {
+	// fill the queue
+	var prevMSE float64
+	for i := 0; i < f.maxTrees; i++ {
 		w := <-out
-		f.Trees[i] = w.t
-	}
+		f.Trees = append(f.Trees, w.t)
 
-	if f.computeOOB {
-		f.MSE, f.RSquared = oob.compute(Y)
+		mse, _ := oob.compute(Y)
+		if i > 4 && math.Abs(mse-prevMSE) < 1e-9 { // oob error converged
+			break
+		}
+		prevMSE = mse
 	}
+	close(quit)
+
+	f.NTrees = len(f.Trees)
+
+	f.MSE, f.RSquared = oob.compute(Y)
 }
 
 // Predict returns the expected value for each example.
