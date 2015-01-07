@@ -24,7 +24,7 @@ func TestBostonFitPredict(t *testing.T) {
 }
 
 func TestBostonVariableImportance(t *testing.T) {
-	reg := NewRegressor(NumTrees(10))
+	reg := NewRegressor(NumTrees(10), ComputeOOB)
 	reg.Fit(bostonX, bostonY)
 
 	sum := 0.0

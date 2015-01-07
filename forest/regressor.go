@@ -20,7 +20,7 @@ type Regressor struct {
 	RSquared    float64
 	NSample     int
 	nFeatures   int
-	maxTrees    int
+	earlyStop   bool
 }
 
 // methods for the forestConfiger interface
@@ -32,7 +32,7 @@ func (c *Regressor) setMaxFeatures(n int)               { c.MaxFeatures = n }
 func (c *Regressor) setNumTrees(n int)                  { c.NTrees = n }
 func (c *Regressor) setNumWorkers(n int)                { c.nWorkers = n }
 func (c *Regressor) setComputeOOB()                     { c.computeOOB = true }
-func (c *Regressor) setMaxTrees(n int)                  { c.maxTrees = n }
+func (c *Regressor) setEarlyStop()                      { c.earlyStop = true }
 
 // NewRegressor returns a configured/initilized random forest regressor.
 // If no options are passed, the returned Regressor will be equivalent to
@@ -40,14 +40,13 @@ func (c *Regressor) setMaxTrees(n int)                  { c.maxTrees = n }
 //
 //	reg := NewRegressor(NumTrees(10), MaxFeatures(-1), MinSplit(2), MinLeaf(1),
 //			MaxDepth(-1), NumWorkers(1))
-func NewRegressor(options ...func(forestConfiger)) *Regressor {
+func NewRegressor(options ...func(Configer)) *Regressor {
 	f := &Regressor{
 		NTrees:      10,
 		MaxFeatures: -1,
 		MinSplit:    2,
 		MinLeaf:     1,
 		MaxDepth:    -1,
-		maxTrees:    -1,
 	}
 
 	for _, opt := range options {
@@ -64,20 +63,21 @@ func (f *Regressor) Fit(X [][]float64, Y []float64) {
 
 	f.nFeatures = len(X[0])
 
-	if f.maxTrees > 0 && f.NTrees > f.maxTrees {
-		f.maxTrees = f.NTrees
+	if f.MaxFeatures < 0 {
+		f.MaxFeatures = f.nFeatures / 3
 	}
 
-	if f.MaxFeatures < 0 {
-		f.MaxFeatures = int(math.Sqrt(float64(f.nFeatures)))
+	if f.earlyStop {
+		f.computeOOB = true
 	}
 
 	var oob *oobRegCtr
-	oob = newOOBRegCtr(len(Y))
+	if f.computeOOB {
+		oob = newOOBRegCtr(len(Y))
+	}
 
 	in := make(chan *fitRegTree)
 	out := make(chan *fitRegTree)
-	quit := make(chan struct{})
 
 	nWorkers := f.nWorkers
 	if nWorkers < 1 {
@@ -95,7 +95,9 @@ func (f *Regressor) Fit(X [][]float64, Y []float64) {
 
 				w.t = reg
 
-				oob.update(X, w.inBag, w.t)
+				if f.computeOOB {
+					oob.update(X, w.inBag, w.t)
+				}
 
 				out <- w
 			}
@@ -103,35 +105,34 @@ func (f *Regressor) Fit(X [][]float64, Y []float64) {
 	}
 
 	go func() {
-		for i := 0; i < f.maxTrees; i++ {
-			select {
-			case <-quit:
-				break
-			default:
-				inx, inBag := bootstrapInx(len(X))
-				in <- &fitRegTree{inx: inx, inBag: inBag}
-			}
+		for i := 0; i < f.NTrees; i++ {
+			inx, inBag := bootstrapInx(len(X))
+			in <- &fitRegTree{inx: inx, inBag: inBag}
 		}
 		close(in)
 	}()
 
 	// fill the queue
-	var prevMSE float64
-	for i := 0; i < f.maxTrees; i++ {
+	var mse, prevMSE float64
+	for i := 0; i < f.NTrees; i++ {
 		w := <-out
-		f.Trees = append(f.Trees, w.t)
 
-		mse, _ := oob.compute(Y)
-		if i > 4 && math.Abs(mse-prevMSE) < 1e-9 { // oob error converged
-			break
+		if f.earlyStop {
+			mse, _ = oob.compute(Y)
+			if i > 4 && math.Abs(mse-prevMSE) < 1e-6 { // oob error converged
+				break
+			}
+			prevMSE = mse
 		}
-		prevMSE = mse
+
+		f.Trees = append(f.Trees, w.t)
 	}
-	close(quit)
 
 	f.NTrees = len(f.Trees)
 
-	f.MSE, f.RSquared = oob.compute(Y)
+	if f.computeOOB {
+		f.MSE, f.RSquared = oob.compute(Y)
+	}
 }
 
 // Predict returns the expected value for each example.

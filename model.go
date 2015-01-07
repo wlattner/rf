@@ -25,20 +25,30 @@ type Model struct {
 }
 
 func (m *Model) Fit(d *parsedInput, opt modelOptions) {
+	args := []func(forest.Configer){
+		forest.NumTrees(opt.nTree),
+		forest.MinSplit(opt.minSplit),
+		forest.MinLeaf(opt.minLeaf),
+		forest.MaxFeatures(opt.maxFeatures),
+		forest.NumWorkers(opt.nWorkers),
+		forest.ComputeOOB,
+		forest.Impurity(opt.impurity),
+	}
+
+	if opt.stopEarly {
+		args = append(args, forest.EarlyStop)
+	}
+
 	start := time.Now()
 	if d.isRegression {
-		reg := forest.NewRegressor(forest.MaxTrees(opt.nTree), forest.MinSplit(opt.minSplit),
-			forest.MinLeaf(opt.minLeaf), forest.MaxFeatures(opt.maxFeatures),
-			forest.NumWorkers(opt.nWorkers), forest.ComputeOOB)
+		reg := forest.NewRegressor(args...)
 
 		reg.Fit(d.X, d.YReg)
 		m.Reg = reg
 		m.IsRegression = true
 		opt.nTree = m.Reg.NTrees
 	} else {
-		clf := forest.NewClassifier(forest.MaxTrees(opt.nTree), forest.MinSplit(opt.minSplit),
-			forest.MinLeaf(opt.minLeaf), forest.MaxFeatures(opt.maxFeatures), forest.Impurity(opt.impurity),
-			forest.NumWorkers(opt.nWorkers), forest.ComputeOOB)
+		clf := forest.NewClassifier(args...)
 
 		clf.Fit(d.X, d.YClf)
 		m.Clf = clf

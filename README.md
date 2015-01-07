@@ -44,6 +44,8 @@ rf -d iris.csv -f iris.model
 
 `--trees arg (=10)` number of trees to include in forest
 
+`--stop_early` stop fitting trees if OOB error estimate converges
+
 `--min_split arg (=2)` minimum number of samples required to split an internal node
 
 `--min_leaf arg (=1)` minimum number of samples in newly created leaves

@@ -21,6 +21,7 @@ var (
 	modelFile   = flag.String([]string{"f", "-final_model"}, "rf.model", "file to output fitted model")
 	impFile     = flag.String([]string{"-var_importance"}, "", "file to output variable importance estimates")
 	// model params
+	earlyStop   = flag.Bool([]string{"-stop_early"}, true, "stop adding trees when OOB error estimate converges")
 	nTree       = flag.Int([]string{"-trees"}, 10, "number of trees")
 	minSplit    = flag.Int([]string{"-min_split"}, 2, "minimum number of samples required to split an internal node")
 	minLeaf     = flag.Int([]string{"-min_leaf"}, 1, "minimum number of samples in newly created leaves")
@@ -40,6 +41,7 @@ type modelOptions struct {
 	maxFeatures int
 	impurity    tree.ImpurityMeasure
 	nWorkers    int
+	stopEarly   bool
 }
 
 // lookup table for impurity measure
@@ -55,6 +57,7 @@ func parseModelOpts() (modelOptions, error) {
 		minLeaf:     *minLeaf,
 		maxFeatures: *maxFeatures,
 		nWorkers:    *nWorkers,
+		stopEarly:   *earlyStop,
 	}
 
 	imp, ok := impurityCode[*impurity]

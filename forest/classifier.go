@@ -1,7 +1,6 @@
 package forest
 
 import (
-	"fmt"
 	"math"
 	"time"
 
@@ -23,7 +22,7 @@ type Classifier struct {
 	Accuracy        float64
 	NSample         int
 	nFeatures       int
-	maxTrees        int
+	earlyStop       bool
 }
 
 // methods for the forestConfiger interface
@@ -35,7 +34,7 @@ func (c *Classifier) setMaxFeatures(n int)               { c.MaxFeatures = n }
 func (c *Classifier) setNumTrees(n int)                  { c.NTrees = n }
 func (c *Classifier) setNumWorkers(n int)                { c.nWorkers = n }
 func (c *Classifier) setComputeOOB()                     { c.computeOOB = true }
-func (c *Classifier) setMaxTrees(n int)                  { c.maxTrees = n }
+func (c *Classifier) setEarlyStop()                      { c.earlyStop = true }
 
 // NewClassifier returns a configured/initialized random forest classifier.
 // If no options are passed, the returned Classifier will be equivalent to
@@ -43,7 +42,7 @@ func (c *Classifier) setMaxTrees(n int)                  { c.maxTrees = n }
 //
 //	clf := NewClassifier(NumTrees(10), MaxFeatures(-1), MinSplit(2), MinLeaf(1),
 //		MaxDepth(-1), Impurity(Gini), NumWorkers(1))
-func NewClassifier(options ...func(forestConfiger)) *Classifier {
+func NewClassifier(options ...func(Configer)) *Classifier {
 	f := &Classifier{
 		NTrees:      10,
 		MaxFeatures: -1,
@@ -51,7 +50,6 @@ func NewClassifier(options ...func(forestConfiger)) *Classifier {
 		MinLeaf:     1,
 		MaxDepth:    -1,
 		impurity:    Gini,
-		maxTrees:    -1,
 	}
 
 	for _, opt := range options {
@@ -80,22 +78,23 @@ func (f *Classifier) Fit(X [][]float64, Y []string) {
 	f.Classes = classes
 	f.NSample = len(yIDs)
 
-	if f.maxTrees > 0 && f.NTrees > f.maxTrees {
-		f.maxTrees = f.NTrees
-	}
-
 	f.nFeatures = len(X[0])
 
 	if f.MaxFeatures < 0 {
 		f.MaxFeatures = int(math.Sqrt(float64(f.nFeatures)))
 	}
 
+	if f.earlyStop {
+		f.computeOOB = true
+	}
+
 	var oobClassCtr *oobCtr
-	oobClassCtr = newOOBCtr(len(Y), len(f.Classes))
+	if f.computeOOB {
+		oobClassCtr = newOOBCtr(len(Y), len(f.Classes))
+	}
 
 	in := make(chan *fitTree)
 	out := make(chan *fitTree)
-	quit := make(chan struct{})
 
 	nWorkers := f.nWorkers
 	if nWorkers < 1 {
@@ -113,7 +112,9 @@ func (f *Classifier) Fit(X [][]float64, Y []string) {
 
 				w.t = clf
 
-				oobClassCtr.update(X, w.inBag, w.t)
+				if f.computeOOB {
+					oobClassCtr.update(X, w.inBag, w.t)
+				}
 
 				out <- w
 			}
@@ -122,35 +123,34 @@ func (f *Classifier) Fit(X [][]float64, Y []string) {
 
 	// fill the queue
 	go func() {
-		for i := 0; i < f.maxTrees; i++ {
-			select {
-			case <-quit:
-				break
-			default:
-				inx, inBag := bootstrapInx(len(X))
-				in <- &fitTree{inx: inx, inBag: inBag}
-			}
+		for i := 0; i < f.NTrees; i++ {
+			inx, inBag := bootstrapInx(len(X))
+			in <- &fitTree{inx: inx, inBag: inBag}
 		}
 		close(in)
 	}()
 
-	var prevAcc float64
-	for i := 0; i < f.maxTrees; i++ {
+	var acc, prevAcc float64
+	for i := 0; i < f.NTrees; i++ {
 		w := <-out
-		f.Trees = append(f.Trees, w.t)
 
-		_, acc := oobClassCtr.compute(yIDs)
-		if i > 4 && math.Abs(acc-prevAcc) < 1e-12 { // oob error converged
-			fmt.Println("converged")
-			break
+		if f.earlyStop {
+			_, acc = oobClassCtr.compute(yIDs)
+			if i > 4 && math.Abs(acc-prevAcc) < 1e-6 { // oob error converged
+				break
+			}
+			prevAcc = acc
 		}
-		prevAcc = acc
-	}
-	close(quit)
 
+		f.Trees = append(f.Trees, w.t)
+	}
+
+	// set nTrees to number actually fitted
 	f.NTrees = len(f.Trees)
 
-	f.ConfusionMatrix, f.Accuracy = oobClassCtr.compute(yIDs)
+	if f.computeOOB {
+		f.ConfusionMatrix, f.Accuracy = oobClassCtr.compute(yIDs)
+	}
 }
 
 // Predict returns the most probable class id for each example. The id
