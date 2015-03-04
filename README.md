@@ -155,4 +155,5 @@ Documentation for the two packages, forest and tree can be found on godoc. `tree
 References
 ----------
 [1] Louppe, G. (2014) ["Understanding Random Forests: From Theory to Practice"](http://arxiv.org/abs/1407.7502) (PhD thesis)
+
 [2] Breiman, [“Random Forests”](http://link.springer.com/article/10.1023%2FA%3A1010933404324), Machine Learning, 45(1), 5-32, 2001
