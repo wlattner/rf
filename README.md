@@ -1,7 +1,7 @@
 rf
 ==
 
-This is a Go implementation of the random forest algorithm for classification and regression, as described in Louppe, G. (2014) ["Understanding Random Forests: From Theory to Practice"](http://arxiv.org/abs/1407.7502) (PhD thesis). Both the random forest and the decision tree are usable as standalone Go packages. The cli can fit a model from a csv file and make predictions from a previously fitted model. The csv parser is rather limited, only numeric values are accepted.
+This is a Go implementation of the random forest algorithm for classification and regression. Both the random forest and the decision tree are usable as standalone Go packages. The cli can fit a model from a csv file and make predictions from a previously fitted model. The csv parser is rather limited, only numeric feature values are accepted.
 
 [![GoDoc](https://godoc.org/github.com/wlattner/rf?status.svg)](http://godoc.org/github.com/wlattner/rf)
 
@@ -64,7 +64,7 @@ Regression is also supported, the csv parser will detect if the first column is 
 	...
 	"2",5.9,3,5.1,1.8
 
-The parser will get confused and fit a regression model, if this happens, try running with the `--classification` flag.
+the parser will get confused and fit a regression model (it can't tell the difference between `"1"` and `1`), if this happens, try running with the `--classification` flag.
 
 
 **Output**
@@ -151,3 +151,8 @@ Documentation for the two packages, forest and tree can be found on godoc. `tree
 **forest:** http://godoc.org/github.com/wlattner/rf/forest
 
 **tree:** http://godoc.org/github.com/wlattner/rf/tree
+
+References
+----------
+[1] Louppe, G. (2014) ["Understanding Random Forests: From Theory to Practice"](http://arxiv.org/abs/1407.7502) (PhD thesis)
+[2] Breiman, [“Random Forests”](http://link.springer.com/article/10.1023%2FA%3A1010933404324), Machine Learning, 45(1), 5-32, 2001
